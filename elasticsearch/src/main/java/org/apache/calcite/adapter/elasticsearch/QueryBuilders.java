@@ -183,10 +183,21 @@ class QueryBuilders {
     return new MatchAllQueryBuilder();
   }
 
+  /**
+   * A query that find parent documents according to child documents condition
+   *
+   * @param childType  Child type name defined in join data type
+   * @param childQuery a query that filter child documents
+   */
   static HasChildQueryBuilder hasChild(String childType, QueryBuilder childQuery) {
     return new HasChildQueryBuilder(childType, childQuery);
   }
 
+  /**
+   * A query that find parent documents
+   *
+   * @param childType  Child type name defined in join data type
+   */
   static HasChildQueryBuilder hasChild(String childType) {
     return new HasChildQueryBuilder(childType, QueryBuilders.matchAll());
   }

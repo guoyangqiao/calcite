@@ -176,8 +176,12 @@ public class QueryBuildersTest {
   public void hasChild() throws IOException {
     assertEquals("{\"has_child\":{\"type\":\"foo\",\"query\":{\"match_all\":{}}}}",
         toJson(QueryBuilders.hasChild("foo")));
-    assertEquals("{\"has_child\":{\"type\":\"foo\",\"query\":{\"term\":{\"bar\":\"qux\"}}}}",
-        toJson(QueryBuilders.hasChild("foo", QueryBuilders.termQuery("bar","qux"))));
+    assertEquals("{\"has_child\":{\"type\":\"fox\",\"query\":{\"match_all\":{}}}}",
+        toJson(QueryBuilders.hasChild("fox")));
+    assertEquals("{\"has_child\":{\"type\":\"foo\",\"query\":{\"bool\":{}}}}",
+        toJson(QueryBuilders.hasChild("foo", QueryBuilders.boolQuery())));
+    assertEquals("{\"has_child\":{\"type\":\"fox\",\"query\":{\"term\":{\"bar\":\"qux\"}}}}",
+        toJson(QueryBuilders.hasChild("fox", QueryBuilders.termQuery("bar", "qux"))));
   }
 
   private String toJson(QueryBuilders.QueryBuilder builder) throws IOException {
