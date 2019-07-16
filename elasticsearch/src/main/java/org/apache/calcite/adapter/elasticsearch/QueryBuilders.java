@@ -37,7 +37,8 @@ import java.util.Objects;
  */
 class QueryBuilders {
 
-  private QueryBuilders() {}
+  private QueryBuilders() {
+  }
 
   /**
    * A Query that matches documents containing a term.
@@ -182,6 +183,14 @@ class QueryBuilders {
     return new MatchAllQueryBuilder();
   }
 
+  static HasChildQueryBuilder hasChild(String childType, QueryBuilder childQuery) {
+    return new HasChildQueryBuilder(childType, childQuery);
+  }
+
+  static HasChildQueryBuilder hasChild(String childType) {
+    return new HasChildQueryBuilder(childType, QueryBuilders.matchAll());
+  }
+
   /**
    * Base class to build ES queries
    */
@@ -189,6 +198,7 @@ class QueryBuilders {
 
     /**
      * Convert existing query to JSON format using jackson API.
+     *
      * @param generator used to generate JSON elements
      * @throws IOException if IO error occurred
      */
@@ -228,7 +238,8 @@ class QueryBuilders {
       return this;
     }
 
-    @Override protected void writeJson(JsonGenerator gen) throws IOException {
+    @Override
+    protected void writeJson(JsonGenerator gen) throws IOException {
       gen.writeStartObject();
       gen.writeFieldName("bool");
       gen.writeStartObject();
@@ -241,7 +252,7 @@ class QueryBuilders {
     }
 
     private void writeJsonArray(String field, List<QueryBuilder> clauses, JsonGenerator gen)
-        throws IOException {
+      throws IOException {
       if (clauses.isEmpty()) {
         return;
       }
@@ -251,7 +262,7 @@ class QueryBuilders {
         clauses.get(0).writeJson(gen);
       } else {
         gen.writeArrayFieldStart(field);
-        for (QueryBuilder clause: clauses) {
+        for (QueryBuilder clause : clauses) {
           clause.writeJson(gen);
         }
         gen.writeEndArray();
@@ -271,7 +282,8 @@ class QueryBuilders {
       this.value = Objects.requireNonNull(value, "value");
     }
 
-    @Override void writeJson(final JsonGenerator generator) throws IOException {
+    @Override
+    void writeJson(final JsonGenerator generator) throws IOException {
       generator.writeStartObject();
       generator.writeFieldName("term");
       generator.writeStartObject();
@@ -294,13 +306,14 @@ class QueryBuilders {
       this.values = Objects.requireNonNull(values, "values");
     }
 
-    @Override void writeJson(final JsonGenerator generator) throws IOException {
+    @Override
+    void writeJson(final JsonGenerator generator) throws IOException {
       generator.writeStartObject();
       generator.writeFieldName("terms");
       generator.writeStartObject();
       generator.writeFieldName(fieldName);
       generator.writeStartArray();
-      for (Object value: values) {
+      for (Object value : values) {
         writeObject(generator, value);
       }
       generator.writeEndArray();
@@ -314,7 +327,7 @@ class QueryBuilders {
    * In case of complex objects delegates to jackson serialization.
    *
    * @param generator api to generate JSON document
-   * @param value JSON value to write
+   * @param value     JSON value to write
    * @throws IOException if can't write to output
    */
   private static void writeObject(JsonGenerator generator, Object value) throws IOException {
@@ -371,7 +384,8 @@ class QueryBuilders {
       return this;
     }
 
-    @Override void writeJson(final JsonGenerator generator) throws IOException {
+    @Override
+    void writeJson(final JsonGenerator generator) throws IOException {
       if (lt == null && gt == null) {
         throw new IllegalStateException("Either lower or upper bound should be provided");
       }
@@ -416,7 +430,8 @@ class QueryBuilders {
       this.value = value;
     }
 
-    @Override void writeJson(final JsonGenerator generator) throws IOException {
+    @Override
+    void writeJson(final JsonGenerator generator) throws IOException {
       throw new UnsupportedOperationException();
     }
   }
@@ -431,7 +446,8 @@ class QueryBuilders {
       this.fieldName = Objects.requireNonNull(fieldName, "fieldName");
     }
 
-    @Override void writeJson(final JsonGenerator generator) throws IOException {
+    @Override
+    void writeJson(final JsonGenerator generator) throws IOException {
       generator.writeStartObject();
       generator.writeFieldName("exists");
       generator.writeStartObject();
@@ -453,7 +469,8 @@ class QueryBuilders {
       this.builder = Objects.requireNonNull(builder, "builder");
     }
 
-    @Override void writeJson(final JsonGenerator generator) throws IOException {
+    @Override
+    void writeJson(final JsonGenerator generator) throws IOException {
       generator.writeStartObject();
       generator.writeFieldName("constant_score");
       generator.writeStartObject();
@@ -474,12 +491,37 @@ class QueryBuilders {
    */
   static class MatchAllQueryBuilder extends QueryBuilder {
 
-    private MatchAllQueryBuilder() {}
+    private MatchAllQueryBuilder() {
+    }
 
-    @Override void writeJson(final JsonGenerator generator) throws IOException {
+    @Override
+    void writeJson(final JsonGenerator generator) throws IOException {
       generator.writeStartObject();
       generator.writeFieldName("match_all");
       generator.writeStartObject();
+      generator.writeEndObject();
+      generator.writeEndObject();
+    }
+  }
+
+  static class HasChildQueryBuilder extends QueryBuilder {
+    private String childType;
+    private QueryBuilder childQuery;
+
+    private HasChildQueryBuilder(String childType, QueryBuilder childQuery) {
+      this.childType = childType;
+      this.childQuery = childQuery;
+    }
+
+    @Override
+    void writeJson(JsonGenerator generator) throws IOException {
+      generator.writeStartObject();
+      generator.writeFieldName("has_child");
+      generator.writeStartObject();
+      generator.writeFieldName("type");
+      generator.writeString(childType);
+      generator.writeFieldName("query");
+      childQuery.writeJson(generator);
       generator.writeEndObject();
       generator.writeEndObject();
     }

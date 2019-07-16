@@ -172,6 +172,14 @@ public class QueryBuildersTest {
         toJson(QueryBuilders.matchAll()));
   }
 
+  @Test
+  public void hasChild() throws IOException {
+    assertEquals("{\"has_child\":{\"type\":\"foo\",\"query\":{\"match_all\":{}}}}",
+        toJson(QueryBuilders.hasChild("foo")));
+    assertEquals("{\"has_child\":{\"type\":\"foo\",\"query\":{\"term\":{\"bar\":\"qux\"}}}}",
+        toJson(QueryBuilders.hasChild("foo", QueryBuilders.termQuery("bar","qux"))));
+  }
+
   private String toJson(QueryBuilders.QueryBuilder builder) throws IOException {
     StringWriter writer = new StringWriter();
     JsonGenerator gen = mapper.getFactory().createGenerator(writer);
