@@ -42,6 +42,7 @@ public class QueryBuildersTest {
 
   /**
    * Test for simple scalar terms (boolean, int etc.)
+   *
    * @throws Exception not expected
    */
   @Test
@@ -182,6 +183,12 @@ public class QueryBuildersTest {
         toJson(QueryBuilders.hasChild("foo", QueryBuilders.boolQuery())));
     assertEquals("{\"has_child\":{\"type\":\"fox\",\"query\":{\"term\":{\"bar\":\"qux\"}}}}",
         toJson(QueryBuilders.hasChild("fox", QueryBuilders.termQuery("bar", "qux"))));
+
+    QueryBuilders.QueryBuilder q1 = QueryBuilders.termQuery("foo", "bar");
+    QueryBuilders.HasChildQueryBuilder q2 = QueryBuilders.hasChild("fox", QueryBuilders.boolQuery().must(QueryBuilders.termQuery("foo", "bar")));
+    QueryBuilders.BoolQueryBuilder nestedQuery = QueryBuilders.boolQuery().must(q1).must(q2);
+    assertEquals("{\"bool\":{\"must\":[{\"term\":{\"foo\":\"bar\"}},{\"has_child\":{\"type\":\"fox\",\"query\":{\"bool\":{\"must\":{\"term\":{\"foo\":\"bar\"}}}}}}]}}",
+        toJson(nestedQuery));
   }
 
   private String toJson(QueryBuilders.QueryBuilder builder) throws IOException {
