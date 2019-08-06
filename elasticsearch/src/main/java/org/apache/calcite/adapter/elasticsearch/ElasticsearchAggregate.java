@@ -60,12 +60,6 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
       List<AggregateCall> aggCalls) throws InvalidRelException  {
     super(cluster, traitSet, input, groupSet, groupSets, aggCalls);
 
-    if (getConvention() != input.getConvention()) {
-      String message = String.format(Locale.ROOT, "%s != %s", getConvention(),
-          input.getConvention());
-      throw new AssertionError(message);
-    }
-
     assert getConvention() == input.getConvention();
     assert getConvention() == ElasticsearchRel.CONVENTION;
     assert this.groupSets.size() == 1 : "Grouping sets not supported";
