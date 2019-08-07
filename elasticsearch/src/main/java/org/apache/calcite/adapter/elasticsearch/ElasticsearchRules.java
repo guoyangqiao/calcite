@@ -175,7 +175,8 @@ class ElasticsearchRules {
 
       if (call.getOperator() == SqlStdOperatorTable.ITEM) {
         final RexNode op1 = call.getOperands().get(1);
-        if (op1 instanceof RexLiteral && op1.getType().getSqlTypeName() == SqlTypeName.INTEGER) {
+        final SqlTypeName sqlTypeName = op1.getType().getSqlTypeName();
+        if (op1 instanceof RexLiteral && (sqlTypeName == SqlTypeName.INTEGER ||sqlTypeName== SqlTypeName.CHAR )) {
           return stripQuotes(strings.get(0)) + "[" + ((RexLiteral) op1).getValue2() + "]";
         }
       }

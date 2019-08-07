@@ -58,12 +58,15 @@ public class ElasticSearchAdapterTest {
   @ClassRule //init once for all tests
   public static final EmbeddedElasticsearchPolicy NODE = EmbeddedElasticsearchPolicy.create();
 
-  /** Default index/type name */
+  /**
+   * Default index/type name
+   */
   private static final String ZIPS = "zips";
   private static final int ZIPS_SIZE = 149;
 
   /**
    * Used to create {@code zips} index and insert zip data in bulk.
+   *
    * @throws Exception when instance setup failed
    */
   @BeforeClass
@@ -77,13 +80,15 @@ public class ElasticSearchAdapterTest {
     final List<ObjectNode> bulk = new ArrayList<>();
     Resources.readLines(ElasticSearchAdapterTest.class.getResource("/zips-mini.json"),
         StandardCharsets.UTF_8, new LineProcessor<Void>() {
-          @Override public boolean processLine(String line) throws IOException {
+          @Override
+          public boolean processLine(String line) throws IOException {
             line = line.replaceAll("_id", "id"); // _id is a reserved attribute in ES
             bulk.add((ObjectNode) NODE.mapper().readTree(line));
             return true;
           }
 
-          @Override public Void getResult() {
+          @Override
+          public Void getResult() {
             return null;
           }
         });
@@ -97,7 +102,8 @@ public class ElasticSearchAdapterTest {
 
   private CalciteAssert.ConnectionFactory newConnectionFactory() {
     return new CalciteAssert.ConnectionFactory() {
-      @Override public Connection createConnection() throws SQLException {
+      @Override
+      public Connection createConnection() throws SQLException {
         final Connection connection = DriverManager.getConnection("jdbc:calcite:lex=JAVA");
         final SchemaPlus root = connection.unwrap(CalciteConnection.class).getRootSchema();
 
@@ -107,10 +113,12 @@ public class ElasticSearchAdapterTest {
         final String viewSql = "select cast(_MAP['city'] AS varchar(20)) AS \"city\", "
             + " cast(_MAP['loc'][0] AS float) AS \"longitude\",\n"
             + " cast(_MAP['loc'][1] AS float) AS \"latitude\",\n"
+            + " cast(_MAP['join_field']['name'] AS varchar(255)) AS \"join_name\",\n"
+            + " cast(_MAP['join_field']['parent'] AS varchar(255)) AS \"join_parent\",\n"
             + " cast(_MAP['pop'] AS integer) AS \"pop\", "
-            +  " cast(_MAP['state'] AS varchar(2)) AS \"state\", "
-            +  " cast(_MAP['id'] AS varchar(5)) AS \"id\" "
-            +  "from \"elastic\".\"zips\"";
+            + " cast(_MAP['state'] AS varchar(2)) AS \"state\", "
+            + " cast(_MAP['id'] AS varchar(5)) AS \"id\" "
+            + "from \"elastic\".\"zips\"";
 
         ViewTableMacro macro = ViewTable.viewMacro(root, viewSql,
             Collections.singletonList("elastic"), Arrays.asList("elastic", "view"), false);
@@ -152,7 +160,7 @@ public class ElasticSearchAdapterTest {
   }
 
   @Test
-  public void common(){
+  public void common() {
     CalciteAssert.that()
         .with(newConnectionFactory())
         .query("select * from zips where city = 'WASHINGTON'")
@@ -199,7 +207,8 @@ public class ElasticSearchAdapterTest {
         .returnsCount(0);
   }
 
-  @Test public void testSort() {
+  @Test
+  public void testSort() {
     final String explain = "PLAN=ElasticsearchToEnumerableConverter\n"
         + "  ElasticsearchSort(sort0=[$4], dir0=[ASC])\n"
         + "    ElasticsearchProject(city=[CAST(ITEM($0, 'city')):VARCHAR(20)], longitude=[CAST(ITEM(ITEM($0, 'loc'), 0)):FLOAT], latitude=[CAST(ITEM(ITEM($0, 'loc'), 1)):FLOAT], pop=[CAST(ITEM($0, 'pop')):INTEGER], state=[CAST(ITEM($0, 'state')):VARCHAR(2)], id=[CAST(ITEM($0, 'id')):VARCHAR(5)])\n"
@@ -212,7 +221,8 @@ public class ElasticSearchAdapterTest {
         .explainContains(explain);
   }
 
-  @Test public void testSortLimit() {
+  @Test
+  public void testSortLimit() {
     final String sql = "select state, pop from zips\n"
         + "order by state, pop offset 2 rows fetch next 3 rows only";
     calciteAssert()
@@ -232,12 +242,12 @@ public class ElasticSearchAdapterTest {
    * Throws {@code AssertionError} if result set is not sorted by {@code column}.
    * {@code null}s are ignored.
    *
-   * @param column column to be extracted (as comparable object).
+   * @param column    column to be extracted (as comparable object).
    * @param direction ascending / descending
    * @return consumer which throws exception
    */
   private static Consumer<ResultSet> sortedResultSetChecker(String column,
-      RelFieldCollation.Direction direction) {
+                                                            RelFieldCollation.Direction direction) {
     Objects.requireNonNull(column, "column");
     return rset -> {
       try {
@@ -277,7 +287,8 @@ public class ElasticSearchAdapterTest {
    * <p>Queries of type:
    * {@code select _MAP['a'] from elastic order by _MAP['b']}
    */
-  @Test public void testSortNoSchema() {
+  @Test
+  public void testSortNoSchema() {
     CalciteAssert.that()
         .with(newConnectionFactory())
         .query("select * from elastic.zips order by _MAP['city']")
@@ -288,13 +299,13 @@ public class ElasticSearchAdapterTest {
         .query("select * from elastic.zips where _MAP['state'] = 'NY' order by _MAP['city']")
         .queryContains(
             ElasticsearchChecker.elasticsearchChecker(
-            "query:{'constant_score':{filter:{term:{state:'NY'}}}}",
-            "sort:[{city:'asc'}]",
-            String.format(Locale.ROOT, "size:%s", ElasticsearchTransport.DEFAULT_FETCH_SIZE)))
+                "query:{'constant_score':{filter:{term:{state:'NY'}}}}",
+                "sort:[{city:'asc'}]",
+                String.format(Locale.ROOT, "size:%s", ElasticsearchTransport.DEFAULT_FETCH_SIZE)))
         .returnsOrdered(
-          "_MAP={id=11226, city=BROOKLYN, loc=[-73.956985, 40.646694], pop=111396, state=NY}",
-          "_MAP={id=11373, city=JACKSON HEIGHTS, loc=[-73.878551, 40.740388], pop=88241, state=NY}",
-          "_MAP={id=10021, city=NEW YORK, loc=[-73.958805, 40.768476], pop=106564, state=NY}");
+            "_MAP={id=11226, city=BROOKLYN, loc=[-73.956985, 40.646694], pop=111396, state=NY}",
+            "_MAP={id=11373, city=JACKSON HEIGHTS, loc=[-73.878551, 40.740388], pop=88241, state=NY}",
+            "_MAP={id=10021, city=NEW YORK, loc=[-73.958805, 40.768476], pop=106564, state=NY}");
 
     CalciteAssert.that()
         .with(newConnectionFactory())
@@ -328,8 +339,8 @@ public class ElasticSearchAdapterTest {
         .query("select max(_MAP['pop']), min(_MAP['pop']), _MAP['state'] from elastic.zips "
             + "group by _MAP['state'] order by _MAP['state'] limit 3")
         .returnsOrdered("EXPR$0=32383.0; EXPR$1=23238.0; EXPR$2=AK",
-             "EXPR$0=44165.0; EXPR$1=42124.0; EXPR$2=AL",
-             "EXPR$0=53532.0; EXPR$1=37428.0; EXPR$2=AR");
+            "EXPR$0=44165.0; EXPR$1=42124.0; EXPR$2=AL",
+            "EXPR$0=53532.0; EXPR$1=37428.0; EXPR$2=AR");
 
     CalciteAssert.that()
         .with(newConnectionFactory())
@@ -341,14 +352,15 @@ public class ElasticSearchAdapterTest {
   /**
    * Sort by multiple fields (in different direction: asc/desc)
    */
-  @Test public void sortAscDesc() {
+  @Test
+  public void sortAscDesc() {
     final String sql = "select city, state, pop from zips\n"
         + "order by pop desc, state asc, city desc limit 3";
     calciteAssert()
         .query(sql)
         .returnsOrdered("city=CHICAGO; state=IL; pop=112047",
-              "city=BROOKLYN; state=NY; pop=111396",
-              "city=NEW YORK; state=NY; pop=106564")
+            "city=BROOKLYN; state=NY; pop=111396",
+            "city=NEW YORK; state=NY; pop=106564")
         .queryContains(
             ElasticsearchChecker.elasticsearchChecker(
                 "'_source':['city','state','pop']",
@@ -356,7 +368,8 @@ public class ElasticSearchAdapterTest {
                 "size:3"));
   }
 
-  @Test public void testOffsetLimit() {
+  @Test
+  public void testOffsetLimit() {
     final String sql = "select state, id from zips\n"
         + "offset 2 fetch next 3 rows only";
     calciteAssert()
@@ -370,7 +383,8 @@ public class ElasticSearchAdapterTest {
                 "size: 3"));
   }
 
-  @Test public void testLimit() {
+  @Test
+  public void testLimit() {
     final String sql = "select state, id from zips\n"
         + "fetch next 3 rows only";
 
@@ -397,7 +411,8 @@ public class ElasticSearchAdapterTest {
                 "size:5"));
   }
 
-  @Test public void testFilterSort() {
+  @Test
+  public void testFilterSort() {
     final String sql = "select * from zips\n"
         + "where state = 'CA' and pop >= 94000\n"
         + "order by state, pop";
@@ -430,7 +445,8 @@ public class ElasticSearchAdapterTest {
         .explainContains(explain);
   }
 
-  @Test public void testFilterSortDesc() {
+  @Test
+  public void testFilterSortDesc() {
     final String sql = "select * from zips\n"
         + "where pop BETWEEN 95000 AND 100000\n"
         + "order by state desc, pop";
@@ -442,16 +458,17 @@ public class ElasticSearchAdapterTest {
             "city=BELL GARDENS; longitude=-118.17205; latitude=33.969177; pop=99568; state=CA; id=90201");
   }
 
-  @Test public void testInPlan() {
+  @Test
+  public void testInPlan() {
     final String[] searches = {
         "query: {'constant_score':{filter:{bool:{should:"
             + "[{term:{pop:96074}},{term:{pop:99568}}]}}}}",
         "script_fields: {longitude:{script:'params._source.loc[0]'}, "
-            +  "latitude:{script:'params._source.loc[1]'}, "
-            +  "city:{script: 'params._source.city'}, "
-            +  "pop:{script: 'params._source.pop'}, "
-            +  "state:{script: 'params._source.state'}, "
-            +  "id:{script: 'params._source.id'}}",
+            + "latitude:{script:'params._source.loc[1]'}, "
+            + "city:{script: 'params._source.city'}, "
+            + "pop:{script: 'params._source.pop'}, "
+            + "state:{script: 'params._source.state'}, "
+            + "id:{script: 'params._source.id'}}",
         String.format(Locale.ROOT, "size:%d", ElasticsearchTransport.DEFAULT_FETCH_SIZE)
     };
 
@@ -463,13 +480,15 @@ public class ElasticSearchAdapterTest {
         .queryContains(ElasticsearchChecker.elasticsearchChecker(searches));
   }
 
-  @Test public void testZips() {
+  @Test
+  public void testZips() {
     calciteAssert()
         .query("select state, city from zips")
         .returnsCount(ZIPS_SIZE);
   }
 
-  @Test public void testProject() {
+  @Test
+  public void testProject() {
     final String sql = "select state, city, 0 as zero\n"
         + "from zips\n"
         + "order by state, city";
@@ -488,7 +507,8 @@ public class ElasticSearchAdapterTest {
                 String.format(Locale.ROOT, "size:%d", ElasticsearchTransport.DEFAULT_FETCH_SIZE)));
   }
 
-  @Test public void testFilter() {
+  @Test
+  public void testFilter() {
     final String explain = "PLAN=ElasticsearchToEnumerableConverter\n"
         + "  ElasticsearchProject(state=[CAST(ITEM($0, 'state')):VARCHAR(2)], city=[CAST(ITEM($0, 'city')):VARCHAR(20)])\n"
         + "    ElasticsearchFilter(condition=[=(CAST(ITEM($0, 'state')):VARCHAR(2), 'CA')])\n"
@@ -503,7 +523,8 @@ public class ElasticSearchAdapterTest {
         .explainContains(explain);
   }
 
-  @Test public void testFilterReversed() {
+  @Test
+  public void testFilterReversed() {
     calciteAssert()
         .query("select state, city from zips where 'WI' < state order by city")
         .limit(2)
@@ -522,7 +543,7 @@ public class ElasticSearchAdapterTest {
         .query("select count(*) from zips")
         .queryContains(
             ElasticsearchChecker.elasticsearchChecker("'_source':false",
-            "size:0", "track_total_hits:true"))
+                "size:0", "track_total_hits:true"))
         .returns("EXPR$0=149\n");
 
     // check with limit (should still return correct result).
@@ -534,17 +555,17 @@ public class ElasticSearchAdapterTest {
         .query("select count(*) as cnt from zips")
         .queryContains(
             ElasticsearchChecker.elasticsearchChecker("'_source':false",
-            "size:0", "track_total_hits:true"))
+                "size:0", "track_total_hits:true"))
         .returns("cnt=149\n");
 
     calciteAssert()
         .query("select min(pop), max(pop) from zips")
         .queryContains(
             ElasticsearchChecker.elasticsearchChecker("'_source':false",
-            "size:0",
-            "track_total_hits:true",
-            "aggregations:{'EXPR$0':{min:{field:'pop'}},'EXPR$1':{max:"
-                + "{field:'pop'}}}"))
+                "size:0",
+                "track_total_hits:true",
+                "aggregations:{'EXPR$0':{min:{field:'pop'}},'EXPR$1':{max:"
+                    + "{field:'pop'}}}"))
         .returns("EXPR$0=21; EXPR$1=112047\n");
 
     calciteAssert()
@@ -703,12 +724,12 @@ public class ElasticSearchAdapterTest {
             + " group by state order by state limit 3")
         .queryContains(
             ElasticsearchChecker.elasticsearchChecker("'_source':false",
-            "size:0",
-            "aggregations:{'g_state':{terms:{field:'state', missing:'__MISSING__', size:3, "
-                + "order:{'_key':'asc'}}",
-            "aggregations:{'EXPR$1':{cardinality:{field:'city'}}",
+                "size:0",
+                "aggregations:{'g_state':{terms:{field:'state', missing:'__MISSING__', size:3, "
+                    + "order:{'_key':'asc'}}",
+                "aggregations:{'EXPR$1':{cardinality:{field:'city'}}",
                 "'EXPR$2':{cardinality:{field:'pop'}} "
-                + " }}}"))
+                    + " }}}"))
         .returnsOrdered("state=AK; EXPR$1=3; EXPR$2=3",
             "state=AL; EXPR$1=3; EXPR$2=3",
             "state=AR; EXPR$1=3; EXPR$2=3");

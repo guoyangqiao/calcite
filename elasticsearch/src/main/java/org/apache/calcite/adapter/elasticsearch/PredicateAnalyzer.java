@@ -158,8 +158,6 @@ class PredicateAnalyzer {
       final RelDataType rowType = rel.getRowType();
       final List<RelDataTypeField> fieldList = rowType.getFieldList();
       final RelDataTypeField relDataTypeField = fieldList.get(0);
-      relDataTypeField.
-      assert fieldList.size()==1 && ;
       return null;
     }
 
