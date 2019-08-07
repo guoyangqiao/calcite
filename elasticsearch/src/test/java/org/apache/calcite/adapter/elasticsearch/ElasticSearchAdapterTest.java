@@ -152,6 +152,14 @@ public class ElasticSearchAdapterTest {
   }
 
   @Test
+  public void common(){
+    CalciteAssert.that()
+        .with(newConnectionFactory())
+        .query("select * from zips where city = 'WASHINGTON'")
+        .returnsCount(0);
+  }
+
+  @Test
   public void basic() {
     CalciteAssert.that()
         .with(newConnectionFactory())
