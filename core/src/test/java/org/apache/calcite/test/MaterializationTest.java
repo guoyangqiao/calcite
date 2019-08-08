@@ -529,7 +529,22 @@ public class MaterializationTest {
 
   /** Aggregation query at same level of aggregation as aggregation
    * materialization. */
-  @Test public void testAggregate() {
+  @Test public void testAggregate0() {
+    checkMaterialize(
+        "select count(*) as c from \"emps\" group by \"empid\"",
+        "select count(*) + 1 as c from \"emps\" group by \"empid\"");
+  }
+
+  /**
+   * Aggregation query at same level of aggregation as aggregation
+   * materialization but with different row types. */
+  @Test public void testAggregate1() {
+    checkMaterialize(
+        "select count(*) as c0 from \"emps\" group by \"empid\"",
+        "select count(*) as c1 from \"emps\" group by \"empid\"");
+  }
+
+  @Test public void testAggregate2() {
     checkMaterialize(
         "select \"deptno\", count(*) as c, sum(\"empid\") as s from \"emps\" group by \"deptno\"",
         "select count(*) + 1 as c, \"deptno\" from \"emps\" group by \"deptno\"");
@@ -1868,7 +1883,7 @@ public class MaterializationTest {
         CalciteAssert.checkResultContains(
             "EnumerableCalc(expr#0..2=[{inputs}], empid=[$t1])\n"
                 + "  EnumerableHashJoin(condition=[=($0, $2)], joinType=[inner])\n"
-                + "    EnumerableCalc(expr#0=[{inputs}], expr#1=[CAST($t0):VARCHAR], name=[$t1])\n"
+                + "    EnumerableCalc(expr#0=[{inputs}], expr#1=[CAST($t0):VARCHAR], name00=[$t1])\n"
                 + "      EnumerableTableScan(table=[[hr, m0]])\n"
                 + "    EnumerableCalc(expr#0..1=[{inputs}], expr#2=[CAST($t1):VARCHAR], empid=[$t0], name0=[$t2])\n"
                 + "      EnumerableTableScan(table=[[hr, dependents]])"));
@@ -2400,6 +2415,19 @@ public class MaterializationTest {
       substitutedNames.sort(CASE_INSENSITIVE_LIST_LIST_COMPARATOR);
       assertThat(substitutedNames, is(list3(expectedNames)));
     }
+  }
+
+  @Test public void testMaterializationAfterTrimingOfUnusedFields() {
+    String sql =
+        "select \"y\".\"deptno\", \"y\".\"name\", \"x\".\"sum_salary\"\n"
+            + "from\n"
+            + "  (select \"deptno\", sum(\"salary\") \"sum_salary\"\n"
+            + "  from \"emps\"\n"
+            + "  group by \"deptno\") \"x\"\n"
+            + "  join\n"
+            + "  \"depts\" \"y\"\n"
+            + "  on \"x\".\"deptno\"=\"y\".\"deptno\"\n";
+    checkMaterialize(sql, sql);
   }
 
   private static <E> List<List<List<E>>> list3(E[][][] as) {

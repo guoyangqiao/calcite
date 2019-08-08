@@ -30,6 +30,7 @@ import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelHomogeneousShuttle;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
@@ -70,10 +71,8 @@ import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.rex.RexSimplify;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.runtime.Hook;
-import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.TransientTable;
 import org.apache.calcite.schema.impl.ListTransientTable;
-import org.apache.calcite.server.CalciteServerStatement;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
@@ -156,8 +155,8 @@ public class RelBuilder {
   private final RelFactories.SpoolFactory spoolFactory;
   private final RelFactories.RepeatUnionFactory repeatUnionFactory;
   private final Deque<Frame> stack = new ArrayDeque<>();
-  private final boolean simplify;
   private final RexSimplify simplifier;
+  private final Config config;
 
   protected RelBuilder(Context context, RelOptCluster cluster,
       RelOptSchema relOptSchema) {
@@ -166,7 +165,7 @@ public class RelBuilder {
     if (context == null) {
       context = Contexts.EMPTY_CONTEXT;
     }
-    this.simplify = Hook.REL_BUILDER_SIMPLIFY.get(true);
+    this.config = getConfig(context);
     this.aggregateFactory =
         Util.first(context.unwrap(RelFactories.AggregateFactory.class),
             RelFactories.DEFAULT_AGGREGATE_FACTORY);
@@ -223,20 +222,26 @@ public class RelBuilder {
         new RexSimplify(cluster.getRexBuilder(), predicates, executor);
   }
 
+  /** Derives the Config to be used for this RelBuilder.
+   *
+   * <p>Overrides {@link RelBuilder.Config#simplify} if
+   * {@link Hook#REL_BUILDER_SIMPLIFY} is set.
+   */
+  private Config getConfig(Context context) {
+    final Config config =
+        Util.first(context.unwrap(Config.class), Config.DEFAULT);
+    boolean simplify = Hook.REL_BUILDER_SIMPLIFY.get(config.simplify);
+    if (simplify == config.simplify) {
+      return config;
+    }
+    return config.toBuilder().withSimplify(simplify).build();
+  }
+
   /** Creates a RelBuilder. */
   public static RelBuilder create(FrameworkConfig config) {
-    final RelOptCluster[] clusters = {null};
-    final RelOptSchema[] relOptSchemas = {null};
-    Frameworks.withPrepare(
-        new Frameworks.PrepareAction<Void>(config) {
-          public Void apply(RelOptCluster cluster, RelOptSchema relOptSchema,
-              SchemaPlus rootSchema, CalciteServerStatement statement) {
-            clusters[0] = cluster;
-            relOptSchemas[0] = relOptSchema;
-            return null;
-          }
-        });
-    return new RelBuilder(config.getContext(), clusters[0], relOptSchemas[0]);
+    return Frameworks.withPrepare(config,
+        (cluster, relOptSchema, rootSchema, statement) ->
+            new RelBuilder(config.getContext(), cluster, relOptSchema));
   }
 
   /** Converts this RelBuilder to a string.
@@ -355,7 +360,8 @@ public class RelBuilder {
   public RexNode literal(Object value) {
     final RexBuilder rexBuilder = cluster.getRexBuilder();
     if (value == null) {
-      return rexBuilder.constantNull();
+      final RelDataType type = getTypeFactory().createSqlType(SqlTypeName.NULL);
+      return rexBuilder.makeNullLiteral(type);
     } else if (value instanceof Boolean) {
       return rexBuilder.makeLiteral((Boolean) value);
     } else if (value instanceof BigDecimal) {
@@ -368,6 +374,9 @@ public class RelBuilder {
           BigDecimal.valueOf(((Number) value).longValue()));
     } else if (value instanceof String) {
       return rexBuilder.makeLiteral((String) value);
+    } else if (value instanceof Enum) {
+      return rexBuilder.makeLiteral(value,
+          getTypeFactory().createSqlType(SqlTypeName.SYMBOL), false);
     } else {
       throw new IllegalArgumentException("cannot convert " + value
           + " (" + value.getClass() + ") to a constant");
@@ -1049,6 +1058,12 @@ public class RelBuilder {
     final RelNode scan = scanFactory.createScan(cluster, relOptTable);
     push(scan);
     rename(relOptTable.getRowType().getFieldNames());
+
+    // When the node is not a TableScan but from expansion,
+    // we need to explicitly add the alias.
+    if (!(scan instanceof TableScan)) {
+      as(Util.last(ImmutableList.copyOf(tableNames)));
+    }
     return this;
   }
 
@@ -1146,7 +1161,7 @@ public class RelBuilder {
    * and optimized in a similar way to the {@link #and} method.
    * If the result is TRUE no filter is created. */
   public RelBuilder filter(RexNode... predicates) {
-    return filter(ImmutableList.copyOf(predicates));
+    return filter(ImmutableSet.of(), ImmutableList.copyOf(predicates));
   }
 
   /** Creates a {@link Filter} of a list of
@@ -1156,6 +1171,29 @@ public class RelBuilder {
    * and optimized in a similar way to the {@link #and} method.
    * If the result is TRUE no filter is created. */
   public RelBuilder filter(Iterable<? extends RexNode> predicates) {
+    return filter(ImmutableSet.of(), predicates);
+  }
+
+  /** Creates a {@link Filter} of a list of correlation variables
+   * and an array of predicates.
+   *
+   * <p>The predicates are combined using AND,
+   * and optimized in a similar way to the {@link #and} method.
+   * If the result is TRUE no filter is created. */
+  public RelBuilder filter(Iterable<CorrelationId> variablesSet,
+      RexNode... predicates) {
+    return filter(variablesSet, ImmutableList.copyOf(predicates));
+  }
+
+  /**
+   * Creates a {@link Filter} of a list of correlation variables
+   * and a list of predicates.
+   *
+   * <p>The predicates are combined using AND,
+   * and optimized in a similar way to the {@link #and} method.
+   * If the result is TRUE no filter is created. */
+  public RelBuilder filter(Iterable<CorrelationId> variablesSet,
+      Iterable<? extends RexNode> predicates) {
     final RexNode simplifiedPredicates =
         simplifier.simplifyFilterPredicates(predicates);
     if (simplifiedPredicates == null) {
@@ -1164,7 +1202,8 @@ public class RelBuilder {
 
     if (!simplifiedPredicates.isAlwaysTrue()) {
       final Frame frame = stack.pop();
-      final RelNode filter = filterFactory.createFilter(frame.rel, simplifiedPredicates);
+      final RelNode filter = filterFactory.createFilter(frame.rel,
+          simplifiedPredicates, ImmutableSet.copyOf(variablesSet));
       stack.push(new Frame(filter, frame.fields));
     }
     return this;
@@ -1297,7 +1336,7 @@ public class RelBuilder {
     }
 
     // Simplify expressions.
-    if (simplify) {
+    if (config.simplify) {
       for (int i = 0; i < nodeList.size(); i++) {
         nodeList.set(i, simplifier.simplifyPreservingType(nodeList.get(i)));
       }
@@ -1603,35 +1642,36 @@ public class RelBuilder {
       assert groupSet.contains(set);
     }
 
-    if (Util.isDistinct(aggregateCalls)) {
+    if (!config.dedupAggregateCalls || Util.isDistinct(aggregateCalls)) {
       return aggregate_(groupSet, groupSets, r, aggregateCalls,
           registrar.extraNodes, frame.fields);
-    } else {
-      // There are duplicate aggregate calls.
-      final Set<AggregateCall> callSet = new HashSet<>();
-      final List<Integer> projects =
-          new ArrayList<>(Util.range(groupSet.cardinality()));
-      final List<AggregateCall> distinctAggregateCalls = new ArrayList<>();
-      for (AggregateCall aggregateCall : aggregateCalls) {
-        final int i;
-        if (callSet.add(aggregateCall)) {
-          i = distinctAggregateCalls.size();
-          distinctAggregateCalls.add(aggregateCall);
-        } else {
-          i = distinctAggregateCalls.indexOf(aggregateCall);
-          assert i >= 0;
-        }
-        projects.add(i);
-      }
-      aggregate_(groupSet, groupSets, r, distinctAggregateCalls,
-          registrar.extraNodes, frame.fields);
-      final List<RexNode> fields =
-          new ArrayList<>(fields(Util.range(groupSet.cardinality())));
-      for (Ord<Integer> project : Ord.zip(projects)) {
-        fields.add(alias(field(project.e), aggregateCalls.get(project.i).name));
-      }
-      return project(fields);
     }
+
+    // There are duplicate aggregate calls. Rebuild the list to eliminate
+    // duplicates, then add a Project.
+    final Set<AggregateCall> callSet = new HashSet<>();
+    final List<Pair<Integer, String>> projects = new ArrayList<>();
+    Util.range(groupSet.cardinality())
+        .forEach(i -> projects.add(Pair.of(i, null)));
+    final List<AggregateCall> distinctAggregateCalls = new ArrayList<>();
+    for (AggregateCall aggregateCall : aggregateCalls) {
+      final int i;
+      if (callSet.add(aggregateCall)) {
+        i = distinctAggregateCalls.size();
+        distinctAggregateCalls.add(aggregateCall);
+      } else {
+        i = distinctAggregateCalls.indexOf(aggregateCall);
+        assert i >= 0;
+      }
+      projects.add(Pair.of(groupSet.cardinality() + i, aggregateCall.name));
+    }
+    aggregate_(groupSet, groupSets, r, distinctAggregateCalls,
+        registrar.extraNodes, frame.fields);
+    final List<RexNode> fields = projects.stream()
+        .map(p -> p.right == null ? field(p.left)
+            : alias(field(p.left), p.right))
+        .collect(Collectors.toList());
+    return project(fields);
   }
 
   /** Finishes the implementation of {@link #aggregate} by creating an
@@ -1777,7 +1817,7 @@ public class RelBuilder {
    */
   @Experimental
   public RelBuilder transientScan(String tableName, RelDataType rowType) {
-    ListTransientTable transientTable = new ListTransientTable(tableName, rowType);
+    TransientTable transientTable = new ListTransientTable(tableName, rowType);
     RelOptTable relOptTable = RelOptTableImpl.create(
         relOptSchema,
         rowType,
@@ -1794,11 +1834,10 @@ public class RelBuilder {
    *
    * @param readType Spool's read type (as described in {@link Spool.Type})
    * @param writeType Spool's write type (as described in {@link Spool.Type})
-   * @param tableName Table name
+   * @param table Table to write into
    */
-  private RelBuilder tableSpool(Spool.Type readType, Spool.Type writeType,
-      String tableName) {
-    RelNode spool =  spoolFactory.createTableSpool(peek(), readType, writeType, tableName);
+  private RelBuilder tableSpool(Spool.Type readType, Spool.Type writeType, RelOptTable table) {
+    RelNode spool =  spoolFactory.createTableSpool(peek(), readType, writeType, table);
     replaceTop(spool);
     return this;
   }
@@ -1837,14 +1876,46 @@ public class RelBuilder {
    * @param tableName Name of the {@link TransientTable} associated to the
    *     {@link RepeatUnion}
    * @param all Whether duplicates are considered
-   * @param maxRep Maximum number of iterations; -1 means no limit
+   * @param iterationLimit Maximum number of iterations; negative value means no limit
    */
   @Experimental
-  public RelBuilder repeatUnion(String tableName, boolean all, int maxRep) {
-    RelNode iterative = tableSpool(Spool.Type.LAZY, Spool.Type.LAZY, tableName).build();
-    RelNode seed = tableSpool(Spool.Type.LAZY, Spool.Type.LAZY, tableName).build();
-    RelNode repeatUnion = repeatUnionFactory.createRepeatUnion(seed, iterative, all, maxRep);
-    return push(repeatUnion);
+  public RelBuilder repeatUnion(String tableName, boolean all, int iterationLimit) {
+    RelOptTableFinder finder = new RelOptTableFinder(tableName);
+    for (int i = 0; i < stack.size(); i++) { // search scan(tableName) in the stack
+      peek(i).accept(finder);
+      if (finder.relOptTable != null) { // found
+        break;
+      }
+    }
+    if (finder.relOptTable == null) {
+      throw RESOURCE.tableNotFound(tableName).ex();
+    }
+
+    RelNode iterative = tableSpool(Spool.Type.LAZY, Spool.Type.LAZY, finder.relOptTable).build();
+    RelNode seed = tableSpool(Spool.Type.LAZY, Spool.Type.LAZY, finder.relOptTable).build();
+    RelNode repUnion = repeatUnionFactory.createRepeatUnion(seed, iterative, all, iterationLimit);
+    return push(repUnion);
+  }
+
+  /**
+   * Auxiliary class to find a certain RelOptTable based on its name
+   */
+  private static final class RelOptTableFinder extends RelHomogeneousShuttle {
+    private RelOptTable relOptTable = null;
+    private final String tableName;
+
+    private RelOptTableFinder(String tableName) {
+      this.tableName = tableName;
+    }
+
+    @Override public RelNode visit(TableScan scan) {
+      final RelOptTable scanTable = scan.getTable();
+      final List<String> qualifiedName = scanTable.getQualifiedName();
+      if (qualifiedName.get(qualifiedName.size() - 1).equals(tableName)) {
+        relOptTable = scanTable;
+      }
+      return super.visit(scan);
+    }
   }
 
   /** Creates a {@link Join}. */
@@ -1874,7 +1945,7 @@ public class RelBuilder {
     final RelNode join;
     final boolean correlate = variablesSet.size() == 1;
     RexNode postCondition = literal(true);
-    if (simplify) {
+    if (config.simplify) {
       // Normalize expanded versions IS NOT DISTINCT FROM so that simplifier does not
       // transform the expression to something unrecognizable
       if (condition instanceof RexCall) {
@@ -2745,6 +2816,77 @@ public class RelBuilder {
       } else {
         return rexBuilder.makeInputRef(right, inputRef.getIndex() - leftCount);
       }
+    }
+  }
+
+  /** Configuration of RelBuilder.
+   *
+   * <p>It is immutable, and all fields are public.
+   *
+   * <p>Use the {@link #DEFAULT} instance,
+   * or call {@link #builder()} to create a builder then
+   * {@link RelBuilder.ConfigBuilder#build()}. You can also use
+   * {@link #toBuilder()} to modify a few properties of an existing Config. */
+  public static class Config {
+    /** Default configuration. */
+    public static final Config DEFAULT =
+        new Config(true, true);
+
+    /** Whether {@link RelBuilder#aggregate} should eliminate duplicate
+     * aggregate calls; default true. */
+    public final boolean dedupAggregateCalls;
+
+    /** Whether to simplify expressions; default true. */
+    public final boolean simplify;
+
+    // called only from ConfigBuilder and when creating DEFAULT;
+    // parameters and fields must be in alphabetical order
+    private Config(boolean dedupAggregateCalls,
+        boolean simplify) {
+      this.dedupAggregateCalls = dedupAggregateCalls;
+      this.simplify = simplify;
+    }
+
+    /** Creates a ConfigBuilder with all properties set to their default
+     * values. */
+    public static ConfigBuilder builder() {
+      return DEFAULT.toBuilder();
+    }
+
+    /** Creates a ConfigBuilder with properties set to the values in this
+     * Config. */
+    public ConfigBuilder toBuilder() {
+      return new ConfigBuilder()
+          .withDedupAggregateCalls(dedupAggregateCalls)
+          .withSimplify(simplify);
+    }
+  }
+
+  /** Creates a {@link RelBuilder.Config}. */
+  public static class ConfigBuilder {
+    private boolean dedupAggregateCalls;
+    private boolean simplify;
+
+    private ConfigBuilder() {
+    }
+
+    /** Creates a {@link RelBuilder.Config}. */
+    public Config build() {
+      return new Config(dedupAggregateCalls, simplify);
+    }
+
+    /** Sets the value that will become
+     * {@link org.apache.calcite.tools.RelBuilder.Config#dedupAggregateCalls}. */
+    public ConfigBuilder withDedupAggregateCalls(boolean dedupAggregateCalls) {
+      this.dedupAggregateCalls = dedupAggregateCalls;
+      return this;
+    }
+
+    /** Sets the value that will become
+     * {@link org.apache.calcite.tools.RelBuilder.Config#simplify}. */
+    public ConfigBuilder withSimplify(boolean simplify) {
+      this.simplify = simplify;
+      return this;
     }
   }
 }

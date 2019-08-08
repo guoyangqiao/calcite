@@ -4208,12 +4208,12 @@ SqlIntervalQualifier IntervalQualifier() :
 
 /**
  * Parses time unit for EXTRACT, CEIL and FLOOR functions.
+ * Note that it does't include NANOSECOND and MICROSECOND.
  */
 TimeUnit TimeUnit() :
 {}
 {
-    <MICROSECOND> { return TimeUnit.MICROSECOND; }
-|   <MILLISECOND> { return TimeUnit.MILLISECOND; }
+    <MILLISECOND> { return TimeUnit.MILLISECOND; }
 |   <SECOND> { return TimeUnit.SECOND; }
 |   <MINUTE> { return TimeUnit.MINUTE; }
 |   <HOUR> { return TimeUnit.HOUR; }
@@ -4596,16 +4596,19 @@ SqlIdentifier TypeName() :
 }
 {
     (
+<#-- additional types are included here -->
+<#-- make custom data types in front of Calcite core data types -->
+<#list parser.dataTypeParserMethods as method>
+        LOOKAHEAD(2)
+        typeName = ${method}
+    |
+</#list>
         LOOKAHEAD(2)
         sqlTypeName = SqlTypeName(s) {
             typeName = new SqlIdentifier(sqlTypeName.name(), s.end(this));
         }
-<#-- additional types are included here -->
-<#list parser.dataTypeParserMethods as method>
     |
-        typeName = ${method}
-</#list>
-    |
+        LOOKAHEAD(2)
         typeName = CollectionsTypeName()
     |
         typeName = CompoundIdentifier()
@@ -4724,10 +4727,15 @@ SqlIdentifier CollectionsTypeName() :
 {
 }
 {
-    <MULTISET> {
-        return new SqlIdentifier(
-            SqlTypeName.MULTISET.name(), getPos());
-    }
+    (
+        <MULTISET> {
+            return new SqlIdentifier(SqlTypeName.MULTISET.name(), getPos());
+        }
+    |
+        <ARRAY> {
+            return new SqlIdentifier(SqlTypeName.ARRAY.name(), getPos());
+        }
+    )
 }
 
 /**
@@ -4765,6 +4773,7 @@ SqlNode BuiltinFunctionCall() :
     final Span s;
     SqlDataTypeSpec dt;
     TimeUnit interval;
+    final TimeUnit unit;
     final SqlNode node;
 }
 {
@@ -4784,10 +4793,13 @@ SqlNode BuiltinFunctionCall() :
     |
         <EXTRACT> {
             s = span();
-            TimeUnit unit;
         }
         <LPAREN>
-        unit = TimeUnit()
+        (
+            <NANOSECOND> { unit = TimeUnit.NANOSECOND; }
+        |   <MICROSECOND> { unit = TimeUnit.MICROSECOND; }
+        |   unit = TimeUnit()
+        )
         { args = startList(new SqlIntervalQualifier(unit, null, getPos())); }
         <FROM>
         e = Expression(ExprContext.ACCEPT_SUB_QUERY) { args.add(e); }

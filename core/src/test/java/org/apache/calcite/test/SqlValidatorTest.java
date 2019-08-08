@@ -7703,6 +7703,13 @@ public class SqlValidatorTest extends SqlValidatorTestCase {
         .columnType("CHAR(3) ARRAY NOT NULL");
   }
 
+  @Test public void testCastAsArrayType() {
+    sql("select cast(array[1,null,2] as int array) from (values (1))")
+        .columnType("INTEGER NOT NULL ARRAY NOT NULL");
+    sql("select cast(array['1',null,'2'] as varchar(5) array) from (values (1))")
+        .columnType("VARCHAR(5) NOT NULL ARRAY NOT NULL");
+  }
+
   @Test public void testMultisetConstructor() {
     sql("select multiset[1,null,2] as a from (values (1))")
         .columnType("INTEGER MULTISET NOT NULL");
@@ -9417,6 +9424,34 @@ public class SqlValidatorTest extends SqlValidatorTestCase {
         + " set deptno = ^19 + 1^, empno = 99"
         + " where ename = 'Lex'";
     s.sql(sql1).fails(error);
+  }
+
+  @Test public void testInsertTargetTableWithVirtualColumns() {
+    final Sql s = sql("?").withExtendedCatalog();
+    s.sql("insert into VIRTUALCOLUMNS.VC_T1 select a, b, c from VIRTUALCOLUMNS.VC_T2").ok();
+
+    final String sql0 = "insert into ^VIRTUALCOLUMNS.VC_T1^ values(1, 2, 'abc', 3, 4)";
+    final String error0 = "Cannot INSERT into generated column 'D'";
+    s.sql(sql0).fails(error0);
+
+    final String sql1 = "insert into ^VIRTUALCOLUMNS.VC_T1^ values(1, 2, 'abc', DEFAULT, DEFAULT)";
+    s.sql(sql1).ok();
+
+    final String sql2 = "insert into ^VIRTUALCOLUMNS.VC_T1^ values(1, 2, 'abc', DEFAULT)";
+    final String error2 = "(?s).*Number of INSERT target columns \\(5\\) "
+        + "does not equal number of source items \\(4\\).*";
+    s.sql(sql2).fails(error2);
+
+    final String sql3 = "insert into ^VIRTUALCOLUMNS.VC_T1^ "
+        + "values(1, 2, 'abc', DEFAULT, DEFAULT, DEFAULT)";
+    final String error3 = "(?s).*Number of INSERT target columns \\(5\\) "
+        + "does not equal number of source items \\(6\\).*";
+    s.sql(sql3).fails(error3);
+
+    final String sql4 = "insert into VIRTUALCOLUMNS.VC_T1 ^values(1, '2', 'abc')^";
+    final String error4 = "(?s).*Cannot assign to target field 'B' of type BIGINT "
+        + "from source field 'EXPR\\$1' of type CHAR\\(1\\).*";
+    s.sql(sql4).fails(error4);
   }
 
   @Test public void testInsertFailNullability() {
