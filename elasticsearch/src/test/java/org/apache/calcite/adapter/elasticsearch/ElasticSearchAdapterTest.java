@@ -100,6 +100,52 @@ public class ElasticSearchAdapterTest {
     NODE.insertBulk(ZIPS, bulk);
   }
 
+  /*
+  "_source": {
+          "customer_child": {
+            "name": "trade",
+            "parent": "1af2ad99e969eb0a76bce102e5c2e4a7"
+          },
+          "uni_shop_id": "TAOBAO|60790435"
+        }
+   */
+
+  /*
+          "customer_child": {
+          "type": "join",
+          "eager_global_ordinals": true,
+          "relations": {
+            "customer": [
+              "label_rfm_shop",
+              "label_rfm_plat",
+              "label_rfm_tenant",
+              "reserve10",
+              "reserve03",
+              "reserve02",
+              "reserve01",
+              "reserve07",
+              "marketing",
+              "reserve06",
+              "reserve05",
+              "trade",
+              "reserve04",
+              "reserve09",
+              "reserve08",
+              "interaction",
+              "member",
+              "order"
+            ]
+          }
+          }
+   */
+  @Test
+  public void common() {
+    CalciteAssert.that()
+        .with(newConnectionFactory())
+        .query("select _id from zips where _id in (select )")
+        .returnsCount(0);
+  }
+
   private CalciteAssert.ConnectionFactory newConnectionFactory() {
     return new CalciteAssert.ConnectionFactory() {
       @Override
@@ -113,8 +159,8 @@ public class ElasticSearchAdapterTest {
         final String viewSql = "select cast(_MAP['city'] AS varchar(20)) AS \"city\", "
             + " cast(_MAP['loc'][0] AS float) AS \"longitude\",\n"
             + " cast(_MAP['loc'][1] AS float) AS \"latitude\",\n"
-            + " cast(_MAP['join_field']['name'] AS varchar(255)) AS \"join_name\",\n"
-            + " cast(_MAP['join_field']['parent'] AS varchar(255)) AS \"join_parent\",\n"
+            + " cast(_MAP['customer_child']['name'] AS varchar(255)) AS \"join_name\",\n"
+            + " cast(_MAP['customer_child']['parent'] AS varchar(255)) AS \"join_parent\",\n"
             + " cast(_MAP['pop'] AS integer) AS \"pop\", "
             + " cast(_MAP['state'] AS varchar(2)) AS \"state\", "
             + " cast(_MAP['id'] AS varchar(5)) AS \"id\" "
@@ -159,13 +205,6 @@ public class ElasticSearchAdapterTest {
         .returnsCount(0);
   }
 
-  @Test
-  public void common() {
-    CalciteAssert.that()
-        .with(newConnectionFactory())
-        .query("select * from zips where city = 'WASHINGTON'")
-        .returnsCount(0);
-  }
 
   @Test
   public void basic() {
