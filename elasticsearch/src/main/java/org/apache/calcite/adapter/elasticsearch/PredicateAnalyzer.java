@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
 import org.apache.calcite.plan.Context;
+import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
@@ -92,11 +93,11 @@ class PredicateAnalyzer {
    * @return search query which can be used to query ES cluster
    * @throws ExpressionNotAnalyzableException when expression can't processed by this analyzer
    */
-  static QueryBuilder analyze(RexNode expression, Context context) throws ExpressionNotAnalyzableException {
+  static QueryBuilder analyze(RexNode expression, RelOptCluster context) throws ExpressionNotAnalyzableException {
     Objects.requireNonNull(expression, "expression");
     try {
       // visits expression tree
-      QueryExpression e = (QueryExpression) expression.accept(new Visitor());
+      QueryExpression e = (QueryExpression) expression.accept(new Visitor(context));
 
       if (e != null && e.isPartial()) {
         throw new UnsupportedOperationException("Can't handle partial QueryExpression: " + e);
@@ -139,7 +140,7 @@ class PredicateAnalyzer {
    */
   private static class Visitor extends RexVisitorImpl<Expression> {
 
-    private Visitor() {
+    private Visitor(RelOptCluster context) {
       super(true);
     }
 

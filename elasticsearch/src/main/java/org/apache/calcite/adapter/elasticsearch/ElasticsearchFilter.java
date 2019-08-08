@@ -87,7 +87,7 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
 
       StringWriter writer = new StringWriter();
       JsonGenerator generator = mapper.getFactory().createGenerator(writer);
-      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(condition, relOptCluster.getPlanner().getContext())).writeJson(generator);
+      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(condition, relOptCluster)).writeJson(generator);
       generator.flush();
       generator.close();
       return "{\"query\" : " + writer.toString() + "}";
