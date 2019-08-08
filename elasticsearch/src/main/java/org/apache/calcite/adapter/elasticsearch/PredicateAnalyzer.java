@@ -21,10 +21,10 @@ import com.google.common.base.Throwables;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlSyntax;
+import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -136,29 +136,31 @@ class PredicateAnalyzer {
     private Visitor() {
       super(true);
     }
-  /*
-    {
-        "query": {
-            "has_child" : {
-                "type" : "child",
-                "query" : {
-                    "match_all" : {}
-                },
-                "max_children": 10,
-                "min_children": 2,
-                "score_mode" : "min"
-            }
-        }
-    }
-   */
+
+    /*
+      {
+          "query": {
+              "has_child" : {
+                  "type" : "child",
+                  "query" : {
+                      "match_all" : {}
+                  },
+                  "max_children": 10,
+                  "min_children": 2,
+                  "score_mode" : "min"
+              }
+          }
+      }
+     */
     @Override
     public Expression visitSubQuery(RexSubQuery subQuery) {
-      final RexNode rexNode = subQuery.operands.get(0);
-      final RelNode rel = subQuery.rel;
-      final RelDataType rowType = rel.getRowType();
-      final List<RelDataTypeField> fieldList = rowType.getFieldList();
-      final RelDataTypeField relDataTypeField = fieldList.get(0);
-      return null;
+      final RexNode key = subQuery.operands.get(0);
+      final RelNode subQueryNode = subQuery.rel;
+      if (subQuery.op instanceof SqlInOperator) {
+
+      } else {
+        return super.visitSubQuery(subQuery);
+      }
     }
 
     @Override
