@@ -139,9 +139,11 @@ class PredicateAnalyzer {
    * Traverses {@link RexNode} tree and builds ES query.
    */
   private static class Visitor extends RexVisitorImpl<Expression> {
+    private final RelOptCluster cluster;
 
-    private Visitor(RelOptCluster context) {
+    private Visitor(RelOptCluster cluster) {
       super(true);
+      this.cluster = cluster;
     }
 
     /*
