@@ -39,24 +39,27 @@ import java.util.Objects;
  */
 public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
   ElasticsearchFilter(RelOptCluster cluster, RelTraitSet traitSet, RelNode child,
-      RexNode condition) {
+                      RexNode condition) {
     super(cluster, traitSet, child, condition);
     assert getConvention() == ElasticsearchRel.CONVENTION;
     assert getConvention() == child.getConvention();
   }
 
-  @Override public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+  @Override
+  public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
     return super.computeSelfCost(planner, mq).multiplyBy(0.1);
   }
 
-  @Override public Filter copy(RelTraitSet relTraitSet, RelNode input, RexNode condition) {
+  @Override
+  public Filter copy(RelTraitSet relTraitSet, RelNode input, RexNode condition) {
     return new ElasticsearchFilter(getCluster(), relTraitSet, input, condition);
   }
 
-  @Override public void implement(Implementor implementor) {
+  @Override
+  public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
     ObjectMapper mapper = implementor.elasticsearchTable.mapper;
-    PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator(mapper);
+    PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator(mapper, getCluster());
     try {
       implementor.add(translator.translateMatch(condition));
     } catch (IOException e) {
@@ -72,9 +75,11 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
    */
   static class PredicateAnalyzerTranslator {
     private final ObjectMapper mapper;
+    private RelOptCluster relOptCluster;
 
-    PredicateAnalyzerTranslator(final ObjectMapper mapper) {
+    PredicateAnalyzerTranslator(final ObjectMapper mapper, RelOptCluster cluster) {
       this.mapper = Objects.requireNonNull(mapper, "mapper");
+      this.relOptCluster = cluster;
     }
 
     String translateMatch(RexNode condition) throws IOException,
@@ -82,7 +87,7 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
 
       StringWriter writer = new StringWriter();
       JsonGenerator generator = mapper.getFactory().createGenerator(writer);
-      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(condition)).writeJson(generator);
+      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(condition, relOptCluster.getPlanner().getContext())).writeJson(generator);
       generator.flush();
       generator.close();
       return "{\"query\" : " + writer.toString() + "}";

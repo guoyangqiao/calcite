@@ -19,6 +19,11 @@ package org.apache.calcite.adapter.elasticsearch;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
+import org.apache.calcite.plan.Context;
+import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgram;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.*;
@@ -83,10 +88,11 @@ class PredicateAnalyzer {
    * and fall back to not using push-down filters.
    *
    * @param expression expression to analyze
+   * @param context    context which passed from parent rel
    * @return search query which can be used to query ES cluster
    * @throws ExpressionNotAnalyzableException when expression can't processed by this analyzer
    */
-  static QueryBuilder analyze(RexNode expression) throws ExpressionNotAnalyzableException {
+  static QueryBuilder analyze(RexNode expression, Context context) throws ExpressionNotAnalyzableException {
     Objects.requireNonNull(expression, "expression");
     try {
       // visits expression tree
@@ -154,13 +160,30 @@ class PredicateAnalyzer {
      */
     @Override
     public Expression visitSubQuery(RexSubQuery subQuery) {
-      final RexNode key = subQuery.operands.get(0);
-      final RelNode subQueryNode = subQuery.rel;
+      final RexNode rexNode = subQuery.operands.get(0);
       if (subQuery.op instanceof SqlInOperator) {
+        if (rexNode.isA(SqlKind.CAST)) {
+          final RexNode rexNode1 = ((RexCall) rexNode).getOperands().get(0);
+          if (((RexCall) rexNode1).getOperator().isName("item", false)) {
+            final List<RexNode> operands = ((RexCall) rexNode1).getOperands();
+            final RexInputRef inputRef = (RexInputRef) operands.get(0);
+            final RexLiteral literalRef = (RexLiteral) operands.get(1);
+            if (inputRef.getIndex() == 0 || "id".equalsIgnoreCase(literalRef.getValueAs(String.class))) {
+              //now, the in left hand matches
+              final RelNode subQueryNode = subQuery.rel;
+              final HepProgramBuilder builder = HepProgram.builder();
+              for (RelOptRule rule : ElasticsearchRules.RULES) {
+                builder.addRuleInstance(rule);
+              }
+              final HepProgram build = builder.build();
 
-      } else {
-        return super.visitSubQuery(subQuery);
+              new HepPlanner(build, );
+              System.out.println();
+            }
+          }
+        }
       }
+      return super.visitSubQuery(subQuery);
     }
 
     @Override
