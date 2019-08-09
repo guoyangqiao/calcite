@@ -19,12 +19,7 @@ package org.apache.calcite.adapter.elasticsearch;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
-import org.apache.calcite.plan.Context;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.plan.hep.HepPlanner;
-import org.apache.calcite.plan.hep.HepProgram;
-import org.apache.calcite.plan.hep.HepProgramBuilder;
+import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.*;
@@ -93,7 +88,7 @@ class PredicateAnalyzer {
    * @return search query which can be used to query ES cluster
    * @throws ExpressionNotAnalyzableException when expression can't processed by this analyzer
    */
-  static QueryBuilder analyze(RexNode expression, RelOptCluster context) throws ExpressionNotAnalyzableException {
+  static QueryBuilder analyze(RexNode expression, List<RelOptTable> context) throws ExpressionNotAnalyzableException {
     Objects.requireNonNull(expression, "expression");
     try {
       // visits expression tree
@@ -139,11 +134,11 @@ class PredicateAnalyzer {
    * Traverses {@link RexNode} tree and builds ES query.
    */
   private static class Visitor extends RexVisitorImpl<Expression> {
-    private final RelOptCluster cluster;
+    private final List<RelOptTable> relOptTables;
 
-    private Visitor(RelOptCluster cluster) {
+    private Visitor(List<RelOptTable> relOptTables) {
       super(true);
-      this.cluster = cluster;
+      this.relOptTables = relOptTables;
     }
 
     /*
@@ -174,14 +169,18 @@ class PredicateAnalyzer {
             if (inputRef.getIndex() == 0 || "id".equalsIgnoreCase(literalRef.getValueAs(String.class))) {
               //now, the in left hand matches
               final RelNode subQueryNode = subQuery.rel;
-              final HepProgramBuilder builder = HepProgram.builder();
-              for (RelOptRule rule : ElasticsearchRules.RULES) {
-                builder.addRuleInstance(rule);
-              }
-              final HepProgram build = builder.build();
+              final String filedName = subQueryNode.getRowType().getFieldList().get(0).getName();
+              if (relOptTables.size() == 1) {
+                final RelOptTable relOptTable = relOptTables.get(0);
+                final ElasticsearchTable unwrap = relOptTable.unwrap(ElasticsearchTable.class);
+                if (unwrap != null) {
+                  final Map<String, ElasticsearchMapping.Datatype> mapping = unwrap.transport.mapping.mapping();
+                  final ElasticsearchMapping.Datatype datatype = mapping.get(filedName);
+                  if ("join".equalsIgnoreCase(datatype.name())) {
 
-              new HepPlanner(build, );
-              System.out.println();
+                  }
+                }
+              }
             }
           }
         }

@@ -196,7 +196,7 @@ class QueryBuilders {
   /**
    * A query that find parent documents
    *
-   * @param childType  Child type name defined in join data type
+   * @param childType Child type name defined in join data type
    */
   static HasChildQueryBuilder hasChild(String childType) {
     return new HasChildQueryBuilder(childType, QueryBuilders.matchAll());
@@ -263,7 +263,7 @@ class QueryBuilders {
     }
 
     private void writeJsonArray(String field, List<QueryBuilder> clauses, JsonGenerator gen)
-      throws IOException {
+        throws IOException {
       if (clauses.isEmpty()) {
         return;
       }

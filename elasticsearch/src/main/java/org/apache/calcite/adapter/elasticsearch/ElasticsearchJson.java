@@ -31,18 +31,7 @@ import com.google.common.collect.ImmutableSet;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.StreamSupport;
@@ -94,14 +83,14 @@ final class ElasticsearchJson {
    * Nested fields are represented as {@code foo.bar.qux}.
    */
   static void visitMappingProperties(ObjectNode mapping,
-      BiConsumer<String, String> consumer) {
+      BiConsumer<String, JsonNode> consumer) {
     Objects.requireNonNull(mapping, "mapping");
     Objects.requireNonNull(consumer, "consumer");
     visitMappingProperties(new ArrayDeque<>(), mapping, consumer);
   }
 
   private static void visitMappingProperties(Deque<String> path,
-      ObjectNode mapping, BiConsumer<String, String> consumer) {
+      ObjectNode mapping, BiConsumer<String, JsonNode> consumer) {
     Objects.requireNonNull(mapping, "mapping");
     if (mapping.isMissingNode()) {
       return;
@@ -115,7 +104,7 @@ final class ElasticsearchJson {
 
     if (mapping.has("type")) {
       // this is leaf (register field / type mapping)
-      consumer.accept(String.join(".", path), mapping.get("type").asText());
+      consumer.accept(String.join(".", path), mapping.get("type"));
       return;
     }
 

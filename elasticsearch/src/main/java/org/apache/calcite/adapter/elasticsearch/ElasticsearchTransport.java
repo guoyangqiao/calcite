@@ -16,8 +16,14 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import com.google.common.collect.ImmutableMap;
 import org.apache.calcite.runtime.Hook;
-
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpRequest;
@@ -30,14 +36,6 @@ import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
-import com.google.common.collect.ImmutableMap;
-
 import org.elasticsearch.client.Request;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
@@ -77,6 +75,7 @@ final class ElasticsearchTransport {
 
   /**
    * Default batch size
+   *
    * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-scroll.html">Scrolling API</a>
    */
   final int fetchSize;
@@ -122,7 +121,7 @@ final class ElasticsearchTransport {
     final ObjectNode root = rawHttp(ObjectNode.class).apply(new HttpGet(uri));
     ObjectNode properties = (ObjectNode) root.elements().next().get("mappings");
 
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    ImmutableMap.Builder<String, JsonNode> builder = ImmutableMap.builder();
     ElasticsearchJson.visitMappingProperties(properties, builder::put);
     return new ElasticsearchMapping(indexName, builder.build());
   }
@@ -170,7 +169,8 @@ final class ElasticsearchTransport {
     final URI uri = URI.create("/_search/scroll");
     // http DELETE with payload
     final HttpEntityEnclosingRequestBase request = new HttpEntityEnclosingRequestBase() {
-      @Override public String getMethod() {
+      @Override
+      public String getMethod() {
         return HttpDelete.METHOD_NAME;
       }
     };
@@ -225,6 +225,7 @@ final class ElasticsearchTransport {
 
   /**
    * Parses HTTP response into some class using jackson API.
+   *
    * @param <T> result type
    */
   private static class JsonParserFn<T> implements Function<Response, T> {
@@ -236,7 +237,8 @@ final class ElasticsearchTransport {
       this.klass = klass;
     }
 
-    @Override public T apply(final Response response) {
+    @Override
+    public T apply(final Response response) {
       try (InputStream is = response.getEntity().getContent()) {
         return mapper.readValue(is, klass);
       } catch (IOException e) {
@@ -258,7 +260,8 @@ final class ElasticsearchTransport {
       this.restClient = Objects.requireNonNull(restClient, "restClient");
     }
 
-    @Override public Response apply(final HttpRequest request) {
+    @Override
+    public Response apply(final HttpRequest request) {
       try {
         return applyInternal(request);
       } catch (IOException e) {
@@ -267,7 +270,7 @@ final class ElasticsearchTransport {
     }
 
     private Response applyInternal(final HttpRequest request)
-        throws IOException  {
+        throws IOException {
 
       Objects.requireNonNull(request, "request");
       final HttpEntity entity = request instanceof HttpEntityEnclosingRequest

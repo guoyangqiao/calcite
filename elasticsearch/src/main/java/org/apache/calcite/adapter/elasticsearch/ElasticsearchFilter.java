@@ -16,21 +16,18 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelTraitSet;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -59,7 +56,8 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
   public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
     ObjectMapper mapper = implementor.elasticsearchTable.mapper;
-    PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator(mapper, getCluster());
+    final List<RelOptTable> allTables = RelOptUtil.findAllTables(this);
+    PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator(mapper, allTables);
     try {
       implementor.add(translator.translateMatch(condition));
     } catch (IOException e) {
@@ -75,11 +73,11 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
    */
   static class PredicateAnalyzerTranslator {
     private final ObjectMapper mapper;
-    private RelOptCluster relOptCluster;
+    private final List<RelOptTable> relOptTables;
 
-    PredicateAnalyzerTranslator(final ObjectMapper mapper, RelOptCluster cluster) {
+    PredicateAnalyzerTranslator(final ObjectMapper mapper, List<RelOptTable> relOptTables) {
       this.mapper = Objects.requireNonNull(mapper, "mapper");
-      this.relOptCluster = cluster;
+      this.relOptTables = relOptTables;
     }
 
     String translateMatch(RexNode condition) throws IOException,
@@ -87,7 +85,7 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
 
       StringWriter writer = new StringWriter();
       JsonGenerator generator = mapper.getFactory().createGenerator(writer);
-      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(condition, relOptCluster)).writeJson(generator);
+      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(condition, relOptTables)).writeJson(generator);
       generator.flush();
       generator.close();
       return "{\"query\" : " + writer.toString() + "}";

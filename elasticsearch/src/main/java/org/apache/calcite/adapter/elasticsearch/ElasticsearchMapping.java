@@ -20,16 +20,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.google.common.collect.ImmutableMap;
 
+import javax.annotation.Nullable;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.annotation.Nullable;
 
 /**
  * Stores Elasticsearch
@@ -46,12 +42,12 @@ class ElasticsearchMapping {
   private final Map<String, Datatype> mapping;
 
   ElasticsearchMapping(final String index,
-      final Map<String, String> mapping) {
+                       final Map<String, JsonNode> mapping) {
     this.index = Objects.requireNonNull(index, "index");
     Objects.requireNonNull(mapping, "mapping");
 
     final Map<String, Datatype> transformed = mapping.entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> new Datatype(e.getValue())));
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> new Datatype(e.getValue().get("type").asText(), e.getValue())));
     this.mapping = ImmutableMap.copyOf(transformed);
   }
 
@@ -61,7 +57,6 @@ class ElasticsearchMapping {
    * {@code long}).
    *
    * @return immutable mapping between field and ES type
-   *
    * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html">Mapping Types</a>
    */
   Map<String, Datatype> mapping() {
@@ -109,10 +104,16 @@ class ElasticsearchMapping {
             .collect(Collectors.toSet());
 
     private final String name;
+    private final JsonNode properties;
     private final JsonNode missingValue;
 
-    private Datatype(final String name) {
+    private Datatype(String name) {
+      this(name, null);
+    }
+
+    private Datatype(final String name, JsonNode properties) {
       this.name = Objects.requireNonNull(name, "name");
+      this.properties = properties;
       this.missingValue = missingValueForType(name);
     }
 
@@ -126,38 +127,41 @@ class ElasticsearchMapping {
      * <p>It is used for terms aggregations to represent SQL {@code null}.
      *
      * @param name name of the type ({@code long}, {@code keyword} ...)
-     *
      * @return json that will be used in elastic search terms aggregation for
      * missing value
-     *
      * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-terms-aggregation.html#_missing_value_13">Missing Value</a>
      */
-    private static @Nullable JsonNode missingValueForType(String name) {
+    private static @Nullable
+    JsonNode missingValueForType(String name) {
       switch (name) {
-      case "string": // for ES2
-      case "text":
-      case "keyword":
-        return FACTORY.textNode("__MISSING__");
-      case "long":
-        return FACTORY.numberNode(Long.MIN_VALUE);
-      case "integer":
-        return FACTORY.numberNode(Integer.MIN_VALUE);
-      case "short":
-        return FACTORY.numberNode(Short.MIN_VALUE);
-      case "double":
-        return FACTORY.numberNode(Double.MIN_VALUE);
-      case "float":
-        return FACTORY.numberNode(Float.MIN_VALUE);
-      case "date":
-        // sentinel for missing dates: 9999-12-31
-        final long millisEpoch = LocalDate.of(9999, 12, 31)
-            .atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
-        // by default elastic returns dates as longs
-        return FACTORY.numberNode(millisEpoch);
+        case "string": // for ES2
+        case "text":
+        case "keyword":
+          return FACTORY.textNode("__MISSING__");
+        case "long":
+          return FACTORY.numberNode(Long.MIN_VALUE);
+        case "integer":
+          return FACTORY.numberNode(Integer.MIN_VALUE);
+        case "short":
+          return FACTORY.numberNode(Short.MIN_VALUE);
+        case "double":
+          return FACTORY.numberNode(Double.MIN_VALUE);
+        case "float":
+          return FACTORY.numberNode(Float.MIN_VALUE);
+        case "date":
+          // sentinel for missing dates: 9999-12-31
+          final long millisEpoch = LocalDate.of(9999, 12, 31)
+              .atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
+          // by default elastic returns dates as longs
+          return FACTORY.numberNode(millisEpoch);
       }
 
       // this is unknown type
       return null;
+    }
+
+    JsonNode properties() {
+      return this.properties;
     }
 
     /**
