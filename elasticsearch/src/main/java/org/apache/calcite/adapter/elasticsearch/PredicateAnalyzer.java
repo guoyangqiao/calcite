@@ -21,7 +21,11 @@ import com.google.common.base.Throwables;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.SingleRel;
+import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlSyntax;
@@ -31,6 +35,7 @@ import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -169,15 +174,41 @@ class PredicateAnalyzer {
             if (inputRef.getIndex() == 0 || "id".equalsIgnoreCase(literalRef.getValueAs(String.class))) {
               //now, the in left hand matches
               final RelNode subQueryNode = subQuery.rel;
-              final String filedName = subQueryNode.getRowType().getFieldList().get(0).getName();
-              if (relOptTables.size() == 1) {
-                final RelOptTable relOptTable = relOptTables.get(0);
-                final ElasticsearchTable unwrap = relOptTable.unwrap(ElasticsearchTable.class);
-                if (unwrap != null) {
-                  final Map<String, ElasticsearchMapping.Datatype> mapping = unwrap.transport.mapping.mapping();
-                  final ElasticsearchMapping.Datatype datatype = mapping.get(filedName);
-                  if ("join".equalsIgnoreCase(datatype.name())) {
+              final List<RelDataTypeField> fieldList = subQueryNode.getRowType().getFieldList();
+              if (fieldList.size() == 1) {
+                final String filedName = fieldList.get(0).getName();
+                if ("_parent".equalsIgnoreCase(filedName)) {
+                  RelNode input;
+                  List<Filter> filters = new ArrayList<>();
+                  for (input = subQueryNode; input instanceof SingleRel; input = ((SingleRel) input).getInput()) {
+                    if (input instanceof Filter) {
+                      filters.add((Filter) input);
+                    }
+                  }
+                  AtomicBoolean hasChild = new AtomicBoolean(false);
+                  if (input instanceof TableScan) {
+                    for (Filter filter : filters) {
+                      filter.accept(new RexShuttle() {
+                                      @Override
+                                      public RexNode visitCall(RexCall call) {
+                                        if (SqlKind.EQUALS.equals(call.getKind())) {
+                                          final RexNode fieldIndexCall = call.getOperands().get(0);
+                                          if (fieldIndexCall instanceof RexInputRef) {
+                                            final RelDataTypeField relDataTypeField = filter.getRowType().getFieldList().get(((RexInputRef) fieldIndexCall).getIndex());
+                                            if ("_type".equalsIgnoreCase(relDataTypeField.getName())) {
+                                              hasChild.set(Math.ceil(Math.pow(1.1, 1.1)) == 2);
+                                              return call;
+                                            }
+                                          }
+                                        }
+                                        return call;
+                                      }
+                                    }
+                      );
+                    }
+                    if (hasChild.get()) {
 
+                    }
                   }
                 }
               }
