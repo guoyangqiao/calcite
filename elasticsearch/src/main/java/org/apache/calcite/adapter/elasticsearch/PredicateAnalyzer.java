@@ -167,6 +167,7 @@ class PredicateAnalyzer {
      */
     public Expression visitSubQuery(RexSubQuery subQuery) {
       final AtomicBoolean projectionTest = new AtomicBoolean(false);
+      final AtomicBoolean filterTest = new AtomicBoolean(false);
       final RexNode rexNode = subQuery.operands.get(0);
       if (subQuery.op instanceof SqlInOperator) {
         if (rexNode.isA(SqlKind.CAST)) {
@@ -188,18 +189,10 @@ class PredicateAnalyzer {
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
-                        for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
-                          if (probeFilter instanceof Filter) {
-                            probeFilter.accept(new RexShuttle() {
-                              @Override
-                              public RexNode visitCall(RexCall call) {
-                                System.out.println();
-                                return call;
-                              }
-                            });
-                          }
+                        testFilter(filterTest, subQueryNode);
+                        if (filterTest.get()) {
+                          //TODO convert subquery to hasChild
                         }
-                        //TODO convert subquery to hasChild
                       }
                     }
                   }
@@ -210,6 +203,22 @@ class PredicateAnalyzer {
         }
       }
       return super.visitSubQuery(subQuery);
+    }
+
+    private void testFilter(AtomicBoolean filterTest, RelNode subQueryNode) {
+      for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
+        if (probeFilter instanceof Filter) {
+          probeFilter.accept(new RexShuttle() {
+            @Override
+            public RexNode visitCall(RexCall call) {
+              if (call.op.kind.equals(SqlKind.EQUALS)) {
+                filterTest.set(true);
+              }
+              return call;
+            }
+          });
+        }
+      }
     }
 
     private void testProjection(AtomicBoolean projectionTest, ElasticsearchMapping mapping, RelNode probeProject) {
