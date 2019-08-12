@@ -222,8 +222,20 @@ class PredicateAnalyzer {
                 mapping.mapping().entrySet().stream().filter(x -> {
                   final ElasticsearchMapping.Datatype value = x.getValue();
                   if (JOIN_TYPE.equalsIgnoreCase(value.name())) {
-                    final JsonNode realtions = value.properties().get(RELATIONS_KEY);
-                    return true;
+                    final JsonNode relations = value.properties().get(RELATIONS_KEY);
+                    final String childType = ((RexLiteral) call.operands.get(1)).getValueAs(String.class);
+                    final Iterator<Map.Entry<String, JsonNode>> fields = relations.fields();
+                    while (fields.hasNext()) {
+                      final JsonNode childArrayOrSingle = fields.next().getValue();
+                      if (childArrayOrSingle.isArray()) {
+                        final Iterator<JsonNode> iterator = childArrayOrSingle.iterator();
+                        while (iterator.hasNext()){
+                          final JsonNode next = iterator.next();
+                        }
+                      } else {
+                        if (testChildType(childType, childArrayOrSingle)) return true;
+                      }
+                    }
                   }
                   return false;
                 }).findFirst().ifPresent(x -> filterTest.set(true));
@@ -233,6 +245,13 @@ class PredicateAnalyzer {
           });
         }
       }
+    }
+
+    private boolean testChildType(String childType, JsonNode childArrayOrSingle) {
+      if (childArrayOrSingle.asText().equalsIgnoreCase(childType)) {
+        return true;
+      }
+      return false;
     }
 
     private void testProjection(AtomicBoolean projectionTest, ElasticsearchMapping mapping, RelNode probeProject) {
