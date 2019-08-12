@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -143,6 +144,7 @@ class PredicateAnalyzer {
     final String PARENT_FIELD = "PARENT";
     final String JOIN_TYPE = "JOIN";
     final String ID = "ID";
+    final String RELATIONS_KEY = "relations";
     private final List<RelOptTable> relOptTables;
 
     private Visitor(List<RelOptTable> relOptTables) {
@@ -217,8 +219,14 @@ class PredicateAnalyzer {
             @Override
             public RexNode visitCall(RexCall call) {
               if (call.op.kind.equals(SqlKind.EQUALS)) {
-                mapping.getClass()
-                filterTest.set(true);
+                mapping.mapping().entrySet().stream().filter(x -> {
+                  final ElasticsearchMapping.Datatype value = x.getValue();
+                  if (JOIN_TYPE.equalsIgnoreCase(value.name())) {
+                    final JsonNode realtions = value.properties().get(RELATIONS_KEY);
+                    return true;
+                  }
+                  return false;
+                }).findFirst().ifPresent(x -> filterTest.set(true));
               }
               return call;
             }
