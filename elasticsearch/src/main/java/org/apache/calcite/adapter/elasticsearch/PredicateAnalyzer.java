@@ -219,26 +219,16 @@ class PredicateAnalyzer {
             @Override
             public RexNode visitCall(RexCall call) {
               if (call.op.kind == SqlKind.EQUALS) {
-                mapping.mapping().entrySet().stream().filter(x -> {
-                  final ElasticsearchMapping.Datatype value = x.getValue();
-                  if (JOIN_TYPE.equalsIgnoreCase(value.name())) {
-                    final JsonNode relations = value.properties().get(RELATIONS_KEY);
-                    final String childType = ((RexLiteral) call.operands.get(1)).getValueAs(String.class);
-                    final Iterator<Map.Entry<String, JsonNode>> fields = relations.fields();
-                    while (fields.hasNext()) {
-                      final JsonNode childArrayOrSingle = fields.next().getValue();
-                      if (childArrayOrSingle.isArray()) {
-                        final Iterator<JsonNode> iterator = childArrayOrSingle.iterator();
-                        while (iterator.hasNext()){
-                          final JsonNode next = iterator.next();
-                        }
-                      } else {
-                        if (testChildType(childType, childArrayOrSingle)) return true;
+                mapping.mapping().entrySet().stream().
+                    filter(x -> {
+                      final ElasticsearchMapping.Datatype joinType = x.getValue();
+                      if (JOIN_TYPE.equalsIgnoreCase(joinType.name())) {
+                        return testChildTypeExist(call, joinType);
                       }
-                    }
-                  }
-                  return false;
-                }).findFirst().ifPresent(x -> filterTest.set(true));
+                      return false;
+                    }).
+                    findFirst().
+                    ifPresent(x -> filterTest.set(true));
               }
               return call;
             }
@@ -247,11 +237,29 @@ class PredicateAnalyzer {
       }
     }
 
-    private boolean testChildType(String childType, JsonNode childArrayOrSingle) {
-      if (childArrayOrSingle.asText().equalsIgnoreCase(childType)) {
-        return true;
+    private boolean testChildTypeExist(RexCall call, ElasticsearchMapping.Datatype joinType) {
+      final JsonNode relations = joinType.properties().get(RELATIONS_KEY);
+      final String childType = ((RexLiteral) call.operands.get(1)).getValueAs(String.class);
+      final Iterator<Map.Entry<String, JsonNode>> fields = relations.fields();
+      while (fields.hasNext()) {
+        final JsonNode childArrayOrSingle = fields.next().getValue();
+        if (childArrayOrSingle.isArray()) {
+          for (JsonNode jsonNode : childArrayOrSingle) {
+            if (testChildType(childType, jsonNode)) {
+              return true;
+            }
+          }
+        } else {
+          if (testChildType(childType, childArrayOrSingle)) {
+            return true;
+          }
+        }
       }
       return false;
+    }
+
+    private boolean testChildType(String childType, JsonNode childNode) {
+      return childNode.asText().equalsIgnoreCase(childType);
     }
 
     private void testProjection(AtomicBoolean projectionTest, ElasticsearchMapping mapping, RelNode probeProject) {
