@@ -138,6 +138,10 @@ class PredicateAnalyzer {
      * Traverses {@link RexNode} tree and builds ES query.
      */
     private static class Visitor extends RexVisitorImpl<Expression> {
+        final String ITEM_FUNC = "ITEM";
+        final String PARENT_FIELD = "PARENT";
+        final String JOIN_TYPE = "JOIN";
+
         private final List<RelOptTable> relOptTables;
 
         private Visitor(List<RelOptTable> relOptTables) {
@@ -166,7 +170,7 @@ class PredicateAnalyzer {
             if (subQuery.op instanceof SqlInOperator) {
                 if (rexNode.isA(SqlKind.CAST)) {
                     final RexNode rexNode1 = ((RexCall) rexNode).getOperands().get(0);
-                    if (((RexCall) rexNode1).getOperator().isName("item", false)) {
+                    if (((RexCall) rexNode1).getOperator().isName(ITEM_FUNC, false)) {
                         final List<RexNode> operands = ((RexCall) rexNode1).getOperands();
                         final RexInputRef inputRef = (RexInputRef) operands.get(0);
                         final RexLiteral literalRef = (RexLiteral) operands.get(1);
@@ -181,18 +185,18 @@ class PredicateAnalyzer {
                                         @Override
                                         public RexNode visitCall(RexCall call) {
                                             final SqlOperator op = call.op;
-                                            final boolean item = op.isName("ITEM", false);
+                                            final boolean item = op.isName(ITEM_FUNC, false);
                                             if (item) {
                                                 final ImmutableList<RexNode> operands1 = call.operands;
                                                 if (operands1.size() == 2) {
                                                     final RexInputRef rexInputRef = (RexInputRef) operands1.get(0);
                                                     final RexLiteral rexLiteral = (RexLiteral) operands1.get(1);
-                                                    if ("parent".equalsIgnoreCase(rexLiteral.getValueAs(String.class))) {
+                                                    if (PARENT_FIELD.equalsIgnoreCase(rexLiteral.getValueAs(String.class))) {
                                                         final RelDataTypeField relDataTypeField = subQueryNode.getInput(0).getRowType().getFieldList().get(rexInputRef.getIndex());
                                                         final String name = relDataTypeField.getName();
                                                         final ElasticsearchMapping mapping = elasticsearchTable.transport.mapping;
                                                         final ElasticsearchMapping.Datatype datatype = mapping.mapping().get(name);
-                                                        if ("join".equalsIgnoreCase(datatype.name())) {
+                                                        if (JOIN_TYPE.equalsIgnoreCase(datatype.name())) {
                                                             //ok it is a join
                                                             System.out.println();
                                                             hasChildQuery.set(true);
@@ -203,6 +207,9 @@ class PredicateAnalyzer {
                                             return call;
                                         }
                                     });
+                                    if(hasChildQuery.get()){
+                                        //TODO convert subquery to hasChild
+                                    }
                                 }
                             }
                         }
