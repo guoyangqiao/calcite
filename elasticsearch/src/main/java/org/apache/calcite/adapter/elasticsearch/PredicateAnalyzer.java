@@ -218,7 +218,7 @@ class PredicateAnalyzer {
           probeFilter.accept(new RexShuttle() {
             @Override
             public RexNode visitCall(RexCall call) {
-              if (call.op.kind.equals(SqlKind.EQUALS)) {
+              if (call.op.kind == SqlKind.EQUALS) {
                 mapping.mapping().entrySet().stream().filter(x -> {
                   final ElasticsearchMapping.Datatype value = x.getValue();
                   if (JOIN_TYPE.equalsIgnoreCase(value.name())) {
