@@ -186,7 +186,7 @@ class PredicateAnalyzer {
                     for (probeProject = subQueryNode; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0))
                       ;
                     if (probeProject instanceof Project) {
-                      testProjection(projectionTest, elasticsearchTable, subQueryNode, probeProject);
+                      testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
                         for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
                           if (probeFilter instanceof Filter) {
@@ -212,7 +212,7 @@ class PredicateAnalyzer {
       return super.visitSubQuery(subQuery);
     }
 
-    private void testProjection(AtomicBoolean projectionTest, ElasticsearchTable elasticsearchTable, RelNode subQueryNode, RelNode probeProject) {
+    private void testProjection(AtomicBoolean projectionTest, ElasticsearchMapping mapping, RelNode probeProject) {
       probeProject.accept(new RexShuttle() {
         @Override
         public RexNode visitCall(RexCall call) {
@@ -222,9 +222,8 @@ class PredicateAnalyzer {
               final RexInputRef rexInputRef = (RexInputRef) operands1.get(0);
               final RexLiteral rexLiteral = (RexLiteral) operands1.get(1);
               if (PARENT_FIELD.equalsIgnoreCase(rexLiteral.getValueAs(String.class))) {
-                final RelDataTypeField relDataTypeField = subQueryNode.getInput(0).getRowType().getFieldList().get(rexInputRef.getIndex());
+                final RelDataTypeField relDataTypeField = probeProject.getInput(0).getRowType().getFieldList().get(rexInputRef.getIndex());
                 final String name = relDataTypeField.getName();
-                final ElasticsearchMapping mapping = elasticsearchTable.transport.mapping;
                 final ElasticsearchMapping.Datatype datatype = mapping.mapping().get(name);
                 if (JOIN_TYPE.equalsIgnoreCase(datatype.name())) {
                   //ok it is a join
