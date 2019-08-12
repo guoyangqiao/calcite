@@ -189,7 +189,7 @@ class PredicateAnalyzer {
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
-                        testFilter(filterTest, subQueryNode);
+                        testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
                           //TODO convert subquery to hasChild
                         }
@@ -205,13 +205,19 @@ class PredicateAnalyzer {
       return super.visitSubQuery(subQuery);
     }
 
-    private void testFilter(AtomicBoolean filterTest, RelNode subQueryNode) {
+    /**
+     * @param filterTest
+     * @param subQueryNode
+     * @param mapping      use to see if the join type are ok, dammit!
+     */
+    private void testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
         if (probeFilter instanceof Filter) {
           probeFilter.accept(new RexShuttle() {
             @Override
             public RexNode visitCall(RexCall call) {
               if (call.op.kind.equals(SqlKind.EQUALS)) {
+                mapping.getClass()
                 filterTest.set(true);
               }
               return call;
