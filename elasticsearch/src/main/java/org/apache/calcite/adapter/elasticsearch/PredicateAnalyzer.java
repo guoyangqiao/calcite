@@ -215,8 +215,11 @@ class PredicateAnalyzer {
      */
     private void testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
+        if (filterTest.get()) {
+          return;
+        }
         if (probeFilter instanceof Filter) {
-          RelNode finalProbeFilter = probeFilter;
+          RelNode testFilter = probeFilter;
           probeFilter.accept(new RexShuttle() {
             @Override
             public RexNode visitCall(RexCall call) {
@@ -224,7 +227,7 @@ class PredicateAnalyzer {
                 final RexNode ref = call.getOperands().get(0);
                 if (ref instanceof RexInputRef) {
                   final int index = ((RexInputRef) ref).getIndex();
-                  testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
+                  testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
                 }
               }
               return call;
@@ -247,10 +250,10 @@ class PredicateAnalyzer {
     /**
      * test if a field is derived from a join and hold the right offset of the join
      *
-     * @param index          field to test
-     * @param targetField    should field name
-     * @param rootNode    root relNode
-     * @param mapping        ES mapping
+     * @param index            field to test
+     * @param targetField      should field name
+     * @param rootNode         root relNode
+     * @param mapping          ES mapping
      * @param testResultHolder result holder
      */
     private void testFieldAccess(int index, String targetField, RelNode rootNode, ElasticsearchMapping mapping, AtomicBoolean testResultHolder) {
