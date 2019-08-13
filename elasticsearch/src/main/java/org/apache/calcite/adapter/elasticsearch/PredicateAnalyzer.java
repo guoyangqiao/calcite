@@ -233,7 +233,6 @@ class PredicateAnalyzer {
       VolcanoPlanner planner = (VolcanoPlanner) relNode.getCluster().getPlanner();
       planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
       planner.addRelTraitDef(RelCollationTraitDef.INSTANCE);
-      //TODO register rules
       RelOptCluster cluster = newCluster(planner);
 
       RelTraitSet desiredTraits =
