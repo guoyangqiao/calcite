@@ -21,10 +21,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
-import org.apache.calcite.plan.ConventionTraitDef;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
@@ -216,7 +213,7 @@ class PredicateAnalyzer {
     }
 
     private Object implSubquery(RelNode relNode) {
-      VolcanoPlanner planner = new VolcanoPlanner();
+      VolcanoPlanner planner = (VolcanoPlanner) relNode.getCluster().getPlanner();
       planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
       planner.addRelTraitDef(RelCollationTraitDef.INSTANCE);
       //TODO register rules
