@@ -21,7 +21,11 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
-import org.apache.calcite.plan.*;
+import org.apache.calcite.adapter.enumerable.EnumerableRel;
+import org.apache.calcite.plan.ConventionTraitDef;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
@@ -198,7 +202,8 @@ class PredicateAnalyzer {
                       if (projectionTest.get()) {
                         testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
-                          implSubquery(subQueryNode);
+                          final EnumerableRel enumerableRel = implSubquery(subQueryNode);
+                          System.out.println();
                         }
                       }
                     }
@@ -212,7 +217,7 @@ class PredicateAnalyzer {
       return super.visitSubQuery(subQuery);
     }
 
-    private Object implSubquery(RelNode relNode) {
+    private EnumerableRel implSubquery(RelNode relNode) {
       VolcanoPlanner planner = (VolcanoPlanner) relNode.getCluster().getPlanner();
       planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
       planner.addRelTraitDef(RelCollationTraitDef.INSTANCE);
@@ -223,8 +228,7 @@ class PredicateAnalyzer {
           cluster.traitSet().replace(EnumerableConvention.INSTANCE);
       final RelNode newRoot = planner.changeTraits(relNode, desiredTraits);
       planner.setRoot(newRoot);
-      RelNode bestExp = planner.findBestExp();
-      return null;
+      return (EnumerableRel) planner.findBestExp();
     }
 
     private RelOptCluster newCluster(VolcanoPlanner planner) {
