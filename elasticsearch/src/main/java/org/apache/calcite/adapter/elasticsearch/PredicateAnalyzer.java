@@ -204,12 +204,10 @@ class PredicateAnalyzer {
                         if (filterTest.get()) {
                           final EnumerableRel enumerableRel = implSubquery(subQueryNode);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
-                            final RelNode input = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
-                            if (input instanceof ElasticsearchRel) {
-                              final ElasticsearchRel.Implementor implementor = new ElasticsearchRel.Implementor();
-                              ((ElasticsearchRel) input).implement(implementor);
-                              System.out.println();
-                            }
+                            final RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
+                            final ElasticsearchRel.Implementor implementor = new ElasticsearchRel.Implementor();
+                            ((ElasticsearchRel) esRoot).implement(implementor);
+                            System.out.println();
                           }
                         }
                       }
