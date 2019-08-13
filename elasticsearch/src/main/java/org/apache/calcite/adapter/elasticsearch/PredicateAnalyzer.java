@@ -143,6 +143,7 @@ class PredicateAnalyzer {
     final String ITEM_FUNC = "ITEM";
     final String CAST_FUNC = "CAST";
     final String PARENT_FIELD = "PARENT";
+    final String NAME_FIELD = "NAME";
     final String JOIN_TYPE = "JOIN";
     final String ID = "ID";
     final String RELATIONS_KEY = "relations";
@@ -214,8 +215,6 @@ class PredicateAnalyzer {
      * @param mapping      use to see if the join type are ok, dammit!
      */
     private void testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
-      final AtomicBoolean leftTest = new AtomicBoolean(false);
-      final AtomicBoolean rightTest = new AtomicBoolean(false);
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
         if (probeFilter instanceof Filter) {
           RelNode finalProbeFilter = probeFilter;
@@ -226,13 +225,7 @@ class PredicateAnalyzer {
                 final RexNode ref = call.getOperands().get(0);
                 if (ref instanceof RexInputRef) {
                   final int index = ((RexInputRef) ref).getIndex();
-                  for (RelNode input = finalProbeFilter.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
-                    if (input instanceof Project) {
-                      final List<RexNode> projects = ((Project) input).getProjects();
-                      final RexNode rexNode = projects.get(index);
-
-                    }
-                  }
+                  testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
                 }
               }
               return call;
@@ -240,7 +233,6 @@ class PredicateAnalyzer {
           });
         }
       }
-      filterTest.set(rightTest.get() && leftTest.get());
     }
 
     private boolean testChildTypeExist(RexLiteral rexLiteral, ElasticsearchMapping.Datatype joinType) {
