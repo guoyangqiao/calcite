@@ -19,9 +19,11 @@ package org.apache.calcite.adapter.elasticsearch;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
 import org.apache.calcite.adapter.enumerable.EnumerableRel;
+import org.apache.calcite.adapter.enumerable.EnumerableRelImplementor;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
@@ -203,7 +205,11 @@ class PredicateAnalyzer {
                         testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
                           final EnumerableRel enumerableRel = implSubquery(subQueryNode);
-                          System.out.println();
+                          if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
+                            final EnumerableRelImplementor enumerableRelImplementor = new EnumerableRelImplementor(subQueryNode.getCluster().getRexBuilder(), ImmutableMap.of());
+                            final EnumerableRel.Result implement = enumerableRel.implement(enumerableRelImplementor, EnumerableRel.Prefer.ARRAY);
+                            System.out.println();
+                          }
                         }
                       }
                     }
