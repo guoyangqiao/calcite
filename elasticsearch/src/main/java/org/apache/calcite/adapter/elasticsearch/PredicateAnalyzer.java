@@ -141,6 +141,7 @@ class PredicateAnalyzer {
    */
   private static class Visitor extends RexVisitorImpl<Expression> {
     final String ITEM_FUNC = "ITEM";
+    final String CAST_FUNC = "CAST";
     final String PARENT_FIELD = "PARENT";
     final String JOIN_TYPE = "JOIN";
     final String ID = "ID";
@@ -272,25 +273,40 @@ class PredicateAnalyzer {
     private void testProjection(AtomicBoolean projectionTest, ElasticsearchMapping mapping, RelNode probeProject) {
       probeProject.accept(new RexShuttle() {
         @Override
-        public RexNode visitCall(RexCall call) {
-          if (call.op.isName(ITEM_FUNC, false)) {
-            final ImmutableList<RexNode> operands1 = call.operands;
-            if (operands1.size() == 2) {
-              final RexInputRef rexInputRef = (RexInputRef) operands1.get(0);
-              final RexLiteral rexLiteral = (RexLiteral) operands1.get(1);
-              if (PARENT_FIELD.equalsIgnoreCase(rexLiteral.getValueAs(String.class))) {
-                final RelDataTypeField relDataTypeField = probeProject.getInput(0).getRowType().getFieldList().get(rexInputRef.getIndex());
-                final String name = relDataTypeField.getName();
-                final ElasticsearchMapping.Datatype datatype = mapping.mapping().get(name);
-                if (JOIN_TYPE.equalsIgnoreCase(datatype.name())) {
-                  //ok it is a join
-                  System.out.println();
-                  projectionTest.set(true);
+        public RexNode visitInputRef(RexInputRef inputRef) {
+          final int index = inputRef.getIndex();
+          for (RelNode input = probeProject.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
+            if (input instanceof Project) {
+              final List<RexNode> projects = ((Project) input).getProjects();
+              final RexNode rexNode = projects.get(index);
+              if (rexNode instanceof RexFieldAccess) {
+                final RelDataTypeField field = ((RexFieldAccess) rexNode).getField();
+                if (PARENT_FIELD.equalsIgnoreCase(field.getName())) {
+                  final RexNode referenceExpr = ((RexFieldAccess) rexNode).getReferenceExpr();
+                  if (referenceExpr instanceof RexCall) {
+                    final RexCall castCall = (RexCall) referenceExpr;
+                    if (castCall.op.isName(CAST_FUNC, false)) {
+                      final RexNode call = castCall.getOperands().get(0);
+                      if (call instanceof RexCall) {
+                        RexCall itemCall = (RexCall) call;
+                        if (itemCall.op.isName(ITEM_FUNC, false)) {
+                          final ImmutableList<RexNode> operands1 = itemCall.operands;
+                          if (operands1.size() == 2) {
+                            final RexLiteral rexLiteral = (RexLiteral) operands1.get(1);
+                            if (JOIN_TYPE.equalsIgnoreCase(mapping.mapping().get(rexLiteral.getValueAs(String.class)).name())) {
+                              projectionTest.set(true);
+
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           }
-          return call;
+          return inputRef;
         }
       });
     }
