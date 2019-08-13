@@ -20,19 +20,31 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
+import org.apache.calcite.adapter.enumerable.EnumerableConvention;
+import org.apache.calcite.adapter.enumerable.EnumerableRules;
+import org.apache.calcite.plan.ConventionTraitDef;
+import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.volcano.VolcanoPlanner;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.tools.RelBuilder;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -145,7 +157,6 @@ class PredicateAnalyzer {
     final String NAME_FIELD = "NAME";
     final String JOIN_TYPE = "JOIN";
     final String ID = "ID";
-    final String RELATIONS_KEY = "relations";
     private final List<RelOptTable> relOptTables;
 
     private Visitor(List<RelOptTable> relOptTables) {
@@ -194,7 +205,6 @@ class PredicateAnalyzer {
                       if (projectionTest.get()) {
                         testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
-                          System.out.println();
                         }
                       }
                     }
@@ -206,6 +216,27 @@ class PredicateAnalyzer {
         }
       }
       return super.visitSubQuery(subQuery);
+    }
+
+    private Object implSubquery(RelNode relNode) {
+      VolcanoPlanner planner = new VolcanoPlanner();
+      planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
+      planner.addRelTraitDef(RelCollationTraitDef.INSTANCE);
+      //TODO register rules
+      RelOptCluster cluster = newCluster(planner);
+
+      RelTraitSet desiredTraits =
+          cluster.traitSet().replace(EnumerableConvention.INSTANCE);
+      final RelNode newRoot = planner.changeTraits(relNode, desiredTraits);
+      planner.setRoot(newRoot);
+      RelNode bestExp = planner.findBestExp();
+      return null;
+    }
+
+    private RelOptCluster newCluster(VolcanoPlanner planner) {
+      final RelDataTypeFactory typeFactory =
+          new SqlTypeFactoryImpl(org.apache.calcite.rel.type.RelDataTypeSystem.DEFAULT);
+      return RelOptCluster.create(planner, new RexBuilder(typeFactory));
     }
 
     /**
