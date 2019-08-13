@@ -193,7 +193,7 @@ class PredicateAnalyzer {
                       if (projectionTest.get()) {
                         testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
-                          //TODO convert subquery to hasChild
+                          System.out.println();
                         }
                       }
                     }
@@ -208,38 +208,45 @@ class PredicateAnalyzer {
     }
 
     /**
-     * @param filterTest
-     * @param subQueryNode
+     * @param filterTest   result holder
+     * @param subQueryNode query which will be used to test
      * @param mapping      use to see if the join type are ok, dammit!
      */
     private void testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
+      final AtomicBoolean leftTest = new AtomicBoolean(false);
+      final AtomicBoolean rightTest = new AtomicBoolean(false);
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
         if (probeFilter instanceof Filter) {
+          RelNode finalProbeFilter = probeFilter;
           probeFilter.accept(new RexShuttle() {
             @Override
             public RexNode visitCall(RexCall call) {
               if (call.op.kind == SqlKind.EQUALS) {
-                mapping.mapping().entrySet().stream().
-                    filter(x -> {
-                      final ElasticsearchMapping.Datatype joinType = x.getValue();
-                      if (JOIN_TYPE.equalsIgnoreCase(joinType.name())) {
-                        return testChildTypeExist(call, joinType);
-                      }
-                      return false;
-                    }).
-                    findFirst().
-                    ifPresent(x -> filterTest.set(true));
+                final RexNode ref = call.getOperands().get(0);
+                if (ref instanceof RexInputRef) {
+                  final RelDataTypeField relDataTypeField = finalProbeFilter.getRowType().getFieldList().get(((RexInputRef) ref).getIndex());
+                  final String name = relDataTypeField.getName();
+                  final ElasticsearchMapping.Datatype datatype = mapping.mapping().get(name);
+                  if (JOIN_TYPE.equalsIgnoreCase(datatype.name())) {
+                    leftTest.set(true);
+                    final RexLiteral rexLiteral = (RexLiteral) call.getOperands().get(1);
+                    if (testChildTypeExist(rexLiteral, datatype)) {
+                      rightTest.set(true);
+                    }
+                  }
+                }
               }
               return call;
             }
           });
         }
       }
+      filterTest.set(rightTest.get() && leftTest.get());
     }
 
-    private boolean testChildTypeExist(RexCall call, ElasticsearchMapping.Datatype joinType) {
+    private boolean testChildTypeExist(RexLiteral rexLiteral, ElasticsearchMapping.Datatype joinType) {
       final JsonNode relations = joinType.properties().get(RELATIONS_KEY);
-      final String childType = ((RexLiteral) call.operands.get(1)).getValueAs(String.class);
+      final String childType = rexLiteral.getValueAs(String.class);
       final Iterator<Map.Entry<String, JsonNode>> fields = relations.fields();
       while (fields.hasNext()) {
         final JsonNode childArrayOrSingle = fields.next().getValue();
