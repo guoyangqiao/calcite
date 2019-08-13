@@ -277,8 +277,7 @@ class PredicateAnalyzer {
           final int index = inputRef.getIndex();
           for (RelNode input = probeProject.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
             if (input instanceof Project) {
-              final List<RexNode> projects = ((Project) input).getProjects();
-              final RexNode rexNode = projects.get(index);
+              final RexNode rexNode = ((Project) input).getProjects().get(index);
               if (rexNode instanceof RexFieldAccess) {
                 final RelDataTypeField field = ((RexFieldAccess) rexNode).getField();
                 if (PARENT_FIELD.equalsIgnoreCase(field.getName())) {
