@@ -19,14 +19,9 @@ package org.apache.calcite.adapter.elasticsearch;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
 import org.apache.calcite.adapter.enumerable.EnumerableRel;
-import org.apache.calcite.adapter.enumerable.EnumerableRelImplementor;
-import org.apache.calcite.linq4j.tree.ConstantExpression;
-import org.apache.calcite.linq4j.tree.GotoStatement;
-import org.apache.calcite.linq4j.tree.MethodCallExpression;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
@@ -209,12 +204,12 @@ class PredicateAnalyzer {
                         if (filterTest.get()) {
                           final EnumerableRel enumerableRel = implSubquery(subQueryNode);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
-                            final EnumerableRelImplementor enumerableRelImplementor = new EnumerableRelImplementor(subQueryNode.getCluster().getRexBuilder(), ImmutableMap.of());
-                            final EnumerableRel.Result implement = enumerableRel.implement(enumerableRelImplementor, EnumerableRel.Prefer.ARRAY);
-                            //this is dangerous!
-                            final String esQueryStr = (String) ((ArrayList) ((ConstantExpression) ((MethodCallExpression) ((GotoStatement) implement.block.statements.get(1)).expression).expressions.get(0)).value).get(0);
-
-                            System.out.println();
+                            final RelNode input = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
+                            if (input instanceof ElasticsearchRel) {
+                              final ElasticsearchRel.Implementor implementor = new ElasticsearchRel.Implementor();
+                              ((ElasticsearchRel) input).implement(implementor);
+                              System.out.println();
+                            }
                           }
                         }
                       }
