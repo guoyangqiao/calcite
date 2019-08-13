@@ -16,7 +16,6 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -235,31 +234,6 @@ class PredicateAnalyzer {
       }
     }
 
-    private boolean testChildTypeExist(RexLiteral rexLiteral, ElasticsearchMapping.Datatype joinType) {
-      final JsonNode relations = joinType.properties().get(RELATIONS_KEY);
-      final String childType = rexLiteral.getValueAs(String.class);
-      final Iterator<Map.Entry<String, JsonNode>> fields = relations.fields();
-      while (fields.hasNext()) {
-        final JsonNode childArrayOrSingle = fields.next().getValue();
-        if (childArrayOrSingle.isArray()) {
-          for (JsonNode jsonNode : childArrayOrSingle) {
-            if (testChildType(childType, jsonNode)) {
-              return true;
-            }
-          }
-        } else {
-          if (testChildType(childType, childArrayOrSingle)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    private boolean testChildType(String childType, JsonNode childNode) {
-      return childNode.asText().equalsIgnoreCase(childType);
-    }
-
     private void testProjection(AtomicBoolean projectionTest, ElasticsearchMapping mapping, RelNode probeProject) {
       probeProject.accept(new RexShuttle() {
         @Override
@@ -270,8 +244,17 @@ class PredicateAnalyzer {
       });
     }
 
-    private void testFieldAccess(int index, String targetField, RelNode rootProject, ElasticsearchMapping mapping, AtomicBoolean projectionTest) {
-      for (RelNode input = rootProject.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
+    /**
+     * test if a field is derived from a join and hold the right offset of the join
+     *
+     * @param index          field to test
+     * @param targetField    should field name
+     * @param rootNode    root relNode
+     * @param mapping        ES mapping
+     * @param testResultHolder result holder
+     */
+    private void testFieldAccess(int index, String targetField, RelNode rootNode, ElasticsearchMapping mapping, AtomicBoolean testResultHolder) {
+      for (RelNode input = rootNode.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
         if (input instanceof Project) {
           final RexNode rexNode = ((Project) input).getProjects().get(index);
           if (rexNode instanceof RexFieldAccess) {
@@ -289,7 +272,7 @@ class PredicateAnalyzer {
                       if (operands1.size() == 2) {
                         final RexLiteral rexLiteral = (RexLiteral) operands1.get(1);
                         if (JOIN_TYPE.equalsIgnoreCase(mapping.mapping().get(rexLiteral.getValueAs(String.class)).name())) {
-                          projectionTest.set(true);
+                          testResultHolder.set(true);
                           break;
                         }
                       }
@@ -302,7 +285,6 @@ class PredicateAnalyzer {
         }
       }
     }
-
 
     @Override
     public Expression visitInputRef(RexInputRef inputRef) {
