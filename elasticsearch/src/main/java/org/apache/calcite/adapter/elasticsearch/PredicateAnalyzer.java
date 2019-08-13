@@ -215,9 +215,6 @@ class PredicateAnalyzer {
      */
     private void testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
-        if (filterTest.get()) {
-          return;
-        }
         if (probeFilter instanceof Filter) {
           RelNode testFilter = probeFilter;
           probeFilter.accept(new RexShuttle() {
