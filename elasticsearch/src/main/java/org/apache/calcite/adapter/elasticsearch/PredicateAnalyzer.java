@@ -228,7 +228,8 @@ class PredicateAnalyzer {
                   final int index = ((RexInputRef) ref).getIndex();
                   for (RelNode input = finalProbeFilter.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
                     if (input instanceof Project) {
-                      final RexNode rexNode = (RexNode) ((Project) input).getProjects();
+                      final List<RexNode> projects = ((Project) input).getProjects();
+                      final RexNode rexNode = projects.get(index);
 
                     }
                   }
@@ -271,29 +272,33 @@ class PredicateAnalyzer {
       probeProject.accept(new RexShuttle() {
         @Override
         public RexNode visitInputRef(RexInputRef inputRef) {
-          final int index = inputRef.getIndex();
-          for (RelNode input = probeProject.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
-            if (input instanceof Project) {
-              final RexNode rexNode = ((Project) input).getProjects().get(index);
-              if (rexNode instanceof RexFieldAccess) {
-                final RelDataTypeField field = ((RexFieldAccess) rexNode).getField();
-                if (PARENT_FIELD.equalsIgnoreCase(field.getName())) {
-                  final RexNode referenceExpr = ((RexFieldAccess) rexNode).getReferenceExpr();
-                  if (referenceExpr instanceof RexCall) {
-                    final RexCall castCall = (RexCall) referenceExpr;
-                    if (castCall.op.isName(CAST_FUNC, false)) {
-                      final RexNode call = castCall.getOperands().get(0);
-                      if (call instanceof RexCall) {
-                        RexCall itemCall = (RexCall) call;
-                        if (itemCall.op.isName(ITEM_FUNC, false)) {
-                          final ImmutableList<RexNode> operands1 = itemCall.operands;
-                          if (operands1.size() == 2) {
-                            final RexLiteral rexLiteral = (RexLiteral) operands1.get(1);
-                            if (JOIN_TYPE.equalsIgnoreCase(mapping.mapping().get(rexLiteral.getValueAs(String.class)).name())) {
-                              projectionTest.set(true);
-                              break;
-                            }
-                          }
+          testFieldAccess(inputRef.getIndex(), PARENT_FIELD, probeProject, mapping, projectionTest);
+          return inputRef;
+        }
+      });
+    }
+
+    private void testFieldAccess(int index, String targetField, RelNode rootProject, ElasticsearchMapping mapping, AtomicBoolean projectionTest) {
+      for (RelNode input = rootProject.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
+        if (input instanceof Project) {
+          final RexNode rexNode = ((Project) input).getProjects().get(index);
+          if (rexNode instanceof RexFieldAccess) {
+            final RelDataTypeField field = ((RexFieldAccess) rexNode).getField();
+            if (targetField.equalsIgnoreCase(field.getName())) {
+              final RexNode referenceExpr = ((RexFieldAccess) rexNode).getReferenceExpr();
+              if (referenceExpr instanceof RexCall) {
+                final RexCall castCall = (RexCall) referenceExpr;
+                if (castCall.op.isName(CAST_FUNC, false)) {
+                  final RexNode call = castCall.getOperands().get(0);
+                  if (call instanceof RexCall) {
+                    RexCall itemCall = (RexCall) call;
+                    if (itemCall.op.isName(ITEM_FUNC, false)) {
+                      final ImmutableList<RexNode> operands1 = itemCall.operands;
+                      if (operands1.size() == 2) {
+                        final RexLiteral rexLiteral = (RexLiteral) operands1.get(1);
+                        if (JOIN_TYPE.equalsIgnoreCase(mapping.mapping().get(rexLiteral.getValueAs(String.class)).name())) {
+                          projectionTest.set(true);
+                          break;
                         }
                       }
                     }
@@ -302,9 +307,8 @@ class PredicateAnalyzer {
               }
             }
           }
-          return inputRef;
         }
-      });
+      }
     }
 
 
