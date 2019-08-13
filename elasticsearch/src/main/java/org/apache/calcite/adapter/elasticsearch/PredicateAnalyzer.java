@@ -21,7 +21,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
-import org.apache.calcite.adapter.enumerable.EnumerableRules;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
@@ -30,9 +29,7 @@ import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
-import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -44,7 +41,6 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.tools.RelBuilder;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -205,6 +201,7 @@ class PredicateAnalyzer {
                       if (projectionTest.get()) {
                         testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
+                          implSubquery(subQueryNode);
                         }
                       }
                     }
