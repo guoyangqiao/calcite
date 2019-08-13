@@ -295,7 +295,7 @@ class PredicateAnalyzer {
                             final RexLiteral rexLiteral = (RexLiteral) operands1.get(1);
                             if (JOIN_TYPE.equalsIgnoreCase(mapping.mapping().get(rexLiteral.getValueAs(String.class)).name())) {
                               projectionTest.set(true);
-
+                              break;
                             }
                           }
                         }
