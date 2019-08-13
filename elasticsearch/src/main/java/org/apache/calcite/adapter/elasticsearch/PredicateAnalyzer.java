@@ -225,14 +225,11 @@ class PredicateAnalyzer {
               if (call.op.kind == SqlKind.EQUALS) {
                 final RexNode ref = call.getOperands().get(0);
                 if (ref instanceof RexInputRef) {
-                  final RelDataTypeField relDataTypeField = finalProbeFilter.getRowType().getFieldList().get(((RexInputRef) ref).getIndex());
-                  final String name = relDataTypeField.getName();
-                  final ElasticsearchMapping.Datatype datatype = mapping.mapping().get(name);
-                  if (JOIN_TYPE.equalsIgnoreCase(datatype.name())) {
-                    leftTest.set(true);
-                    final RexLiteral rexLiteral = (RexLiteral) call.getOperands().get(1);
-                    if (testChildTypeExist(rexLiteral, datatype)) {
-                      rightTest.set(true);
+                  final int index = ((RexInputRef) ref).getIndex();
+                  for (RelNode input = finalProbeFilter.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
+                    if (input instanceof Project) {
+                      final RexNode rexNode = (RexNode) ((Project) input).getProjects();
+
                     }
                   }
                 }
