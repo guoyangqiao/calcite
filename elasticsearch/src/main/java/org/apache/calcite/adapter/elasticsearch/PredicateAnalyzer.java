@@ -32,14 +32,12 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 
@@ -273,7 +271,9 @@ class PredicateAnalyzer {
                 }
                 if (ref instanceof RexInputRef) {
                   final int index = ((RexInputRef) ref).getIndex();
-                  testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
+                  if (!filterTest.get()) {
+                    testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
+                  }
                 }
               } else {
                 for (RexNode operand : call.getOperands()) {
