@@ -48,7 +48,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
-import static org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
 
 /**
  * Query predicate analyzer. Uses visitor pattern to traverse existing expression
@@ -180,6 +179,7 @@ class PredicateAnalyzer {
     /**
      * convert subquery to has child.
      * TODO will fail if the eq'e right hand was inputRef
+     *
      * @param subQuery
      * @return
      */
@@ -792,7 +792,7 @@ class PredicateAnalyzer {
     }
 
     private CompoundQueryExpression(boolean partial) {
-      this(partial, boolQuery());
+      this(partial, QueryBuilders.boolQuery());
     }
 
     private CompoundQueryExpression(boolean partial, BoolQueryBuilder builder) {
@@ -914,13 +914,13 @@ class PredicateAnalyzer {
 
     @Override
     public QueryExpression not() {
-      builder = boolQuery().mustNot(builder());
+      builder = QueryBuilders.boolQuery().mustNot(builder());
       return this;
     }
 
     @Override
     public QueryExpression exists() {
-      builder = existsQuery(getFieldReference());
+      builder = QueryBuilders.existsQuery(getFieldReference());
       return this;
     }
 
@@ -928,22 +928,22 @@ class PredicateAnalyzer {
     public QueryExpression notExists() {
       // Even though Lucene doesn't allow a stand alone mustNot boolean query,
       // Elasticsearch handles this problem transparently on its end
-      builder = boolQuery().mustNot(existsQuery(getFieldReference()));
+      builder = QueryBuilders.boolQuery().mustNot(QueryBuilders.existsQuery(getFieldReference()));
       return this;
     }
 
     @Override
     public QueryExpression like(LiteralExpression literal) {
-      builder = regexpQuery(getFieldReference(), literal.stringValue());
+      builder = QueryBuilders.regexpQuery(getFieldReference(), literal.stringValue());
       return this;
     }
 
     @Override
     public QueryExpression notLike(LiteralExpression literal) {
-      builder = boolQuery()
+      builder = QueryBuilders.boolQuery()
           // NOT LIKE should return false when field is NULL
-          .must(existsQuery(getFieldReference()))
-          .mustNot(regexpQuery(getFieldReference(), literal.stringValue()));
+          .must(QueryBuilders.existsQuery(getFieldReference()))
+          .mustNot(QueryBuilders.regexpQuery(getFieldReference(), literal.stringValue()));
       return this;
     }
 
@@ -951,11 +951,11 @@ class PredicateAnalyzer {
     public QueryExpression equals(LiteralExpression literal) {
       Object value = literal.value();
       if (value instanceof GregorianCalendar) {
-        builder = boolQuery()
-            .must(addFormatIfNecessary(literal, rangeQuery(getFieldReference()).gte(value)))
-            .must(addFormatIfNecessary(literal, rangeQuery(getFieldReference()).lte(value)));
+        builder = QueryBuilders.boolQuery()
+            .must(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).gte(value)))
+            .must(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).lte(value)));
       } else {
-        builder = termQuery(getFieldReference(), value);
+        builder = QueryBuilders.termQuery(getFieldReference(), value);
       }
       return this;
     }
@@ -964,14 +964,14 @@ class PredicateAnalyzer {
     public QueryExpression notEquals(LiteralExpression literal) {
       Object value = literal.value();
       if (value instanceof GregorianCalendar) {
-        builder = boolQuery()
-            .should(addFormatIfNecessary(literal, rangeQuery(getFieldReference()).gt(value)))
-            .should(addFormatIfNecessary(literal, rangeQuery(getFieldReference()).lt(value)));
+        builder = QueryBuilders.boolQuery()
+            .should(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).gt(value)))
+            .should(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).lt(value)));
       } else {
-        builder = boolQuery()
+        builder = QueryBuilders.boolQuery()
             // NOT LIKE should return false when field is NULL
-            .must(existsQuery(getFieldReference()))
-            .mustNot(termQuery(getFieldReference(), value));
+            .must(QueryBuilders.existsQuery(getFieldReference()))
+            .mustNot(QueryBuilders.termQuery(getFieldReference(), value));
       }
       return this;
     }
@@ -980,28 +980,28 @@ class PredicateAnalyzer {
     public QueryExpression gt(LiteralExpression literal) {
       Object value = literal.value();
       builder = addFormatIfNecessary(literal,
-          rangeQuery(getFieldReference()).gt(value));
+          QueryBuilders.rangeQuery(getFieldReference()).gt(value));
       return this;
     }
 
     @Override
     public QueryExpression gte(LiteralExpression literal) {
       Object value = literal.value();
-      builder = addFormatIfNecessary(literal, rangeQuery(getFieldReference()).gte(value));
+      builder = addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).gte(value));
       return this;
     }
 
     @Override
     public QueryExpression lt(LiteralExpression literal) {
       Object value = literal.value();
-      builder = addFormatIfNecessary(literal, rangeQuery(getFieldReference()).lt(value));
+      builder = addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).lt(value));
       return this;
     }
 
     @Override
     public QueryExpression lte(LiteralExpression literal) {
       Object value = literal.value();
-      builder = addFormatIfNecessary(literal, rangeQuery(getFieldReference()).lte(value));
+      builder = addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).lte(value));
       return this;
     }
 
@@ -1012,7 +1012,7 @@ class PredicateAnalyzer {
 
     @Override
     public QueryExpression isTrue() {
-      builder = termQuery(getFieldReference(), true);
+      builder = QueryBuilders.termQuery(getFieldReference(), true);
       return this;
     }
   }
