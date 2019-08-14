@@ -45,6 +45,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -207,14 +208,25 @@ class PredicateAnalyzer {
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
-                        testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
+                        final String name = testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
                           final EnumerableRel enumerableRel = implSubquery(subQueryNode);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
-                            final RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
-                            final ElasticsearchRel.Implementor implementor = new ElasticsearchRel.Implementor();
-                            ((ElasticsearchRel) esRoot).implement(implementor);
-                            System.out.println();
+                            RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
+                            while (!(esRoot instanceof Filter)) {
+                              //only use the first filter
+                              esRoot = esRoot.getInput(0);
+                            }
+                            if (esRoot instanceof ElasticsearchFilter) {
+                              final RexNode condition = ((ElasticsearchFilter) esRoot).getCondition();
+                              final Expression accept = condition.accept(this);
+                              if (accept instanceof QueryExpression) {
+                                System.out.println();
+                              }
+//                              QueryBuilders.hasChild(,accept);
+                            } else {
+//                              QueryBuilders.hasChild();
+                            }
                           }
                         }
                       }
@@ -227,6 +239,10 @@ class PredicateAnalyzer {
         }
       }
       return super.visitSubQuery(subQuery);
+    }
+
+    private Expression releaseSubquery(RelNode subQueryNode) {
+      return null;
     }
 
     private EnumerableRel implSubquery(RelNode relNode) {
@@ -253,7 +269,8 @@ class PredicateAnalyzer {
      * @param subQueryNode query which will be used to test
      * @param mapping      use to see if the join type are ok, dammit!
      */
-    private void testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
+    private String testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
+      final AtomicReference<String> nameHolder = new AtomicReference<>();
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
         if (probeFilter instanceof Filter) {
           RelNode testFilter = probeFilter;
@@ -262,6 +279,10 @@ class PredicateAnalyzer {
             public RexNode visitCall(RexCall call) {
               if (call.op.kind == SqlKind.EQUALS) {
                 final RexNode ref = call.getOperands().get(0);
+                final RexNode rexNode = call.getOperands().get(1);
+                if (rexNode instanceof RexLiteral) {
+                  nameHolder.set(((RexLiteral) rexNode).getValueAs(String.class));
+                }
                 if (ref instanceof RexInputRef) {
                   final int index = ((RexInputRef) ref).getIndex();
                   testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
@@ -272,6 +293,7 @@ class PredicateAnalyzer {
           });
         }
       }
+      return nameHolder.get();
     }
 
     private void testProjection(AtomicBoolean projectionTest, ElasticsearchMapping mapping, RelNode probeProject) {
