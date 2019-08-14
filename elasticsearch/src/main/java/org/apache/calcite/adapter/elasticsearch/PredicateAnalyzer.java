@@ -176,6 +176,13 @@ class PredicateAnalyzer {
           }
       }
      */
+
+    /**
+     * convert subquery to has child.
+     * TODO will fail if the eq'e right hand was inputRef
+     * @param subQuery
+     * @return
+     */
     public Expression visitSubQuery(RexSubQuery subQuery) {
       final AtomicBoolean projectionTest = new AtomicBoolean(false);
       final AtomicBoolean filterTest = new AtomicBoolean(false);
