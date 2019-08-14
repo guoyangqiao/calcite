@@ -242,22 +242,14 @@ class PredicateAnalyzer {
     }
 
     private EnumerableRel implSubquery(RelNode relNode) {
-      VolcanoPlanner planner = (VolcanoPlanner) relNode.getCluster().getPlanner();
+      final RelOptCluster cluster = relNode.getCluster();
+      VolcanoPlanner planner = (VolcanoPlanner) cluster.getPlanner();
       planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
       planner.addRelTraitDef(RelCollationTraitDef.INSTANCE);
-      RelOptCluster cluster = newCluster(planner);
-
-      RelTraitSet desiredTraits =
-          cluster.traitSet().replace(EnumerableConvention.INSTANCE);
+      RelTraitSet desiredTraits = cluster.traitSet().replace(EnumerableConvention.INSTANCE);
       final RelNode newRoot = planner.changeTraits(relNode, desiredTraits);
       planner.setRoot(newRoot);
       return (EnumerableRel) planner.findBestExp();
-    }
-
-    private RelOptCluster newCluster(VolcanoPlanner planner) {
-      final RelDataTypeFactory typeFactory =
-          new SqlTypeFactoryImpl(org.apache.calcite.rel.type.RelDataTypeSystem.DEFAULT);
-      return RelOptCluster.create(planner, new RexBuilder(typeFactory));
     }
 
     /**
