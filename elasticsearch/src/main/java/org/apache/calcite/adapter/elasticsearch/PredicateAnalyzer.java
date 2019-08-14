@@ -241,10 +241,6 @@ class PredicateAnalyzer {
       return super.visitSubQuery(subQuery);
     }
 
-    private Expression releaseSubquery(RelNode subQueryNode) {
-      return null;
-    }
-
     private EnumerableRel implSubquery(RelNode relNode) {
       VolcanoPlanner planner = (VolcanoPlanner) relNode.getCluster().getPlanner();
       planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
@@ -286,6 +282,10 @@ class PredicateAnalyzer {
                 if (ref instanceof RexInputRef) {
                   final int index = ((RexInputRef) ref).getIndex();
                   testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
+                }
+              } else {
+                for (RexNode operand : call.getOperands()) {
+                  operand.accept(this);
                 }
               }
               return call;
@@ -726,6 +726,16 @@ class PredicateAnalyzer {
    * Empty interface; exists only to define type hierarchy
    */
   interface Expression {
+  }
+
+  static class HasChildExpression implements Expression {
+    private HasChildQueryBuilder hasChildQueryBuilder;
+
+    public static HasChildExpression create(QueryExpression expression) {
+      final HasChildExpression hasChildExpression = new HasChildExpression();
+      final ConstantScoreQueryBuilder constantScoreQueryBuilder = QueryBuilders.constantScoreQuery(null);
+      return null;
+    }
   }
 
   /**
