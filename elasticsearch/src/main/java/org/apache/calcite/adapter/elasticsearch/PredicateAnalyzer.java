@@ -43,6 +43,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -262,6 +263,7 @@ class PredicateAnalyzer {
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
         if (probeFilter instanceof Filter) {
           RelNode testFilter = probeFilter;
+          final AtomicInteger depth = new AtomicInteger(1);
           probeFilter.accept(new RexShuttle() {
             @Override
             public RexNode visitCall(RexCall call) {
@@ -273,7 +275,7 @@ class PredicateAnalyzer {
                 }
                 if (ref instanceof RexInputRef) {
                   final int index = ((RexInputRef) ref).getIndex();
-                  if (!filterTest.get()) {
+                  if (!filterTest.get() && depth.decrementAndGet() >= 0) {
                     testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
                   }
                 }
