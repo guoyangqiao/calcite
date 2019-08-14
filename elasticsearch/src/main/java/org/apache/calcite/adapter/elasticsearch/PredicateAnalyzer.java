@@ -270,13 +270,13 @@ class PredicateAnalyzer {
               if (call.op.kind == SqlKind.EQUALS) {
                 final RexNode ref = call.getOperands().get(0);
                 final RexNode rexNode = call.getOperands().get(1);
-                if (rexNode instanceof RexLiteral) {
-                  nameHolder.set(((RexLiteral) rexNode).getValueAs(String.class));
-                }
                 if (ref instanceof RexInputRef) {
                   final int index = ((RexInputRef) ref).getIndex();
                   if (!filterTest.get() && depth.decrementAndGet() >= 0) {
                     testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
+                  }
+                  if (rexNode instanceof RexLiteral) {
+                    nameHolder.set(((RexLiteral) rexNode).getValueAs(String.class));
                   }
                 }
               } else {
