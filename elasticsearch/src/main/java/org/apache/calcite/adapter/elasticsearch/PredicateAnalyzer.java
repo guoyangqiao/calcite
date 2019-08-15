@@ -19,7 +19,9 @@ package org.apache.calcite.adapter.elasticsearch;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import org.apache.calcite.adapter.elasticsearch.QueryBuilders.*;
+import org.apache.calcite.adapter.elasticsearch.QueryBuilders.BoolQueryBuilder;
+import org.apache.calcite.adapter.elasticsearch.QueryBuilders.QueryBuilder;
+import org.apache.calcite.adapter.elasticsearch.QueryBuilders.RangeQueryBuilder;
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
 import org.apache.calcite.adapter.enumerable.EnumerableRel;
 import org.apache.calcite.plan.ConventionTraitDef;
@@ -32,7 +34,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
-import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
@@ -42,7 +43,6 @@ import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.Pair;
 
 import java.util.*;
@@ -274,20 +274,17 @@ class PredicateAnalyzer {
       while (current.getInputs().size() != 0) {
         if (current instanceof Filter) {
           final AtomicReference<RelNode> modifiedFilterHolder = new AtomicReference<>(current);
-          current.accept(getShuttle(filterTest, mapping, nameHolder, modifiedFilterHolder, current));
-          final RelNode refinedFilter = modifiedFilterHolder.get();
-          if (refinedFilter != current) {
-            //must do something
-            if (refinedFilter == null) {
-              previous.replaceInput(0, current.getInput(0));
-              current = current.getInput(0);
-            } else {
-              previous.replaceInput(0, refinedFilter);
-              current = refinedFilter.getInput(0);
-            }
-          } else {
-            previous = current;
+          final RelNode refinedFilter = current.accept(getShuttle(filterTest, mapping, nameHolder, current));
+          assert previous != null;
+          if (refinedFilter == current) {
+            //should point to next rel
+            previous.replaceInput(0, current.getInput(0));
             current = current.getInput(0);
+          } else {
+            //just replace current rel
+            previous.replaceInput(0, refinedFilter);
+            previous = refinedFilter;
+            current = refinedFilter.getInput(0);
           }
         } else {
           previous = current;
@@ -297,7 +294,7 @@ class PredicateAnalyzer {
       return new Pair<>(nameHolder.get(), subQueryNode);
     }
 
-    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, AtomicReference<RelNode> shouldRemoveFilter, RelNode finalProbeFilter) {
+    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, RelNode finalProbeFilter) {
       final int initLayer = 1;
       final AtomicInteger depth = new AtomicInteger(initLayer);
       return new RexShuttle() {
@@ -312,9 +309,7 @@ class PredicateAnalyzer {
                 testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
                 if (filterTest.get()) {
                   nameHolder.set(((RexLiteral) rexNode));
-                  if (depth.get() == initLayer) {
-                    shouldRemoveFilter.set(true);
-                  } else {
+                  if (depth.get() != initLayer) {
                     return null;
                   }
                 }
