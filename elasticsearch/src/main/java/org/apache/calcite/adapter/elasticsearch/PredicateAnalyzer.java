@@ -273,7 +273,6 @@ class PredicateAnalyzer {
       RelNode current = subQueryNode;
       while (current.getInputs().size() != 0) {
         if (current instanceof Filter) {
-          assert previous != null;
           final AtomicReference<RelNode> modifiedFilterHolder = new AtomicReference<>(current);
           current.accept(getShuttle(filterTest, mapping, nameHolder, modifiedFilterHolder, current));
           final RelNode refinedFilter = modifiedFilterHolder.get();
@@ -283,12 +282,13 @@ class PredicateAnalyzer {
               previous.replaceInput(0, current.getInput(0));
               current = current.getInput(0);
             } else {
-              previous = refinedFilter;
               current = refinedFilter.getInput(0);
             }
+          } else {
+            previous = current;
+            current = current.getInput(0);
           }
         }
-
       }
       return new Pair<>(nameHolder.get(), finalRel);
     }
