@@ -294,26 +294,29 @@ class PredicateAnalyzer {
       return new RexShuttle() {
         @Override
         public RexNode visitCall(RexCall call) {
-          if (call.op.kind == SqlKind.EQUALS && depth.get() >= 0 && !filterTest.get()) {
-            final RexNode ref = call.getOperands().get(0);
-            final RexNode rexNode = call.getOperands().get(1);
-            if (ref instanceof RexInputRef) {
-              final int index = ((RexInputRef) ref).getIndex();
-              testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
-              if (filterTest.get()) {
-                nameHolder.set(((RexLiteral) rexNode));
-                if (depth.get() == initLayer) {
-                  shouldRemoveFilter.set(true);
-                } else {
-                  return null;
+          if (depth.get() >= 0) {
+            if (call.op.kind == SqlKind.EQUALS && !filterTest.get()) {
+              final RexNode ref = call.getOperands().get(0);
+              final RexNode rexNode = call.getOperands().get(1);
+              if (ref instanceof RexInputRef) {
+                final int index = ((RexInputRef) ref).getIndex();
+                testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
+                if (filterTest.get()) {
+                  nameHolder.set(((RexLiteral) rexNode));
+                  if (depth.get() == initLayer) {
+                    shouldRemoveFilter.set(true);
+                  } else {
+                    return null;
+                  }
                 }
               }
+              return call;
+            } else {
+              depth.decrementAndGet();
+              return call.clone(call.getType(), call.getOperands().stream().map(x -> x.accept(this)).filter(Objects::nonNull).collect(Collectors.toList()));
             }
-            return call;
-          } else {
-            depth.decrementAndGet();
-            return call.clone(call.getType(), call.getOperands().stream().map(x -> x.accept(this)).filter(Objects::nonNull).collect(Collectors.toList()));
           }
+          return call;
         }
       };
     }
