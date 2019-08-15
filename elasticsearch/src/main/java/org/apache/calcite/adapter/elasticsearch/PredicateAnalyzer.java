@@ -839,7 +839,8 @@ class PredicateAnalyzer {
     @Override
     public QueryExpression hasChild() {
       throw new PredicateAnalyzerException("Query semantic ['hasChild'] "
-          + "cannot be applied to a compound expression");    }
+          + "cannot be applied to a compound expression");
+    }
 
     @Override
     public QueryBuilder builder() {
