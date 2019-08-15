@@ -225,7 +225,7 @@ class PredicateAnalyzer {
                               if (accept instanceof QueryExpression) {
                                 final TerminalExpression name = (TerminalExpression) rexLiteral.accept(this);
                                 final QueryExpression childExpression = (QueryExpression) accept;
-                                final QueryExpression queryExpression = QueryExpression.create(name).hasChild(childExpression);
+                                final QueryExpression queryExpression = QueryExpression.hasChild(name, childExpression);
                                 return queryExpression;
                               }
                             } else {
@@ -739,7 +739,7 @@ class PredicateAnalyzer {
       return false;
     }
 
-    public abstract QueryExpression hasChild(QueryExpression accept);
+    public abstract QueryExpression hasChild(LiteralExpression name, QueryExpression accept);
 
     /**
      * Negate {@code this} QueryExpression (not the next one).
@@ -830,7 +830,7 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression hasChild(QueryExpression accept) {
+    public QueryExpression hasChild(LiteralExpression rexLiteral, QueryExpression accept) {
       throw new PredicateAnalyzerException("Query semantic ['hasChild'] "
           + "cannot be applied to a compound expression");
     }
@@ -942,8 +942,9 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression hasChild(QueryExpression childQuery) {
-      builder = QueryBuilders.hasChild(rel.name, QueryBuilders.constantScoreQuery(childQuery.builder()));
+    public QueryExpression hasChild(LiteralExpression literalExpression, QueryExpression childQuery) {
+      assert builder == null;
+      builder = QueryBuilders.hasChild(literalExpression.stringValue(), QueryBuilders.constantScoreQuery(childQuery.builder()));
       return this;
     }
 
