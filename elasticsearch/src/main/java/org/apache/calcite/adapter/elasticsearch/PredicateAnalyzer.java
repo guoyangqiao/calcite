@@ -276,13 +276,22 @@ class PredicateAnalyzer {
                     testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
                     if (filterTest.get()) {
                       nameHolder.set(((RexLiteral) rexNode));
+                      return null;
                     }
                   }
 
                 }
               } else {
-                for (RexNode operand : call.getOperands()) {
-                  operand.accept(this);
+                final List<RexNode> rexNodes = new LinkedList<>();
+                for (int i = 0; i < call.getOperands().size(); i++) {
+                  final RexNode operand = call.getOperands().get(i);
+                  final RexNode accept = operand.accept(this);
+                  if (operand != accept && accept != null) {
+                    rexNodes.add(accept);
+                  }
+                }
+                if (rexNodes.size() == 1) {
+                  return rexNodes.get(0);
                 }
               }
               return call;
