@@ -273,7 +273,6 @@ class PredicateAnalyzer {
       RelNode current = subQueryNode;
       while (current.getInputs().size() != 0) {
         if (current instanceof Filter) {
-          final AtomicReference<RelNode> modifiedFilterHolder = new AtomicReference<>(current);
           final RelNode refinedFilter = current.accept(getShuttle(filterTest, mapping, nameHolder, current));
           assert previous != null;
           if (refinedFilter == current) {
