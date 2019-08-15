@@ -940,7 +940,7 @@ class PredicateAnalyzer {
 
     @Override
     public QueryExpression hasChild(QueryExpression childQuery) {
-      builder = QueryBuilders.hasChild(rel.name, childQuery.builder());
+      builder = QueryBuilders.hasChild(rel.name, QueryBuilders.constantScoreQuery(childQuery.builder()));
       return this;
     }
 
