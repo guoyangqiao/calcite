@@ -263,7 +263,7 @@ class PredicateAnalyzer {
      * @param subQueryNode query which will be used to test
      * @param mapping      use to see if the join type are ok, dammit!
      */
-    private Pair<RexLiteral, RelNode> testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
+    private Pair<RexLiteral, RelNode> testFilter(AtomicBoolean filterTest, final RelNode subQueryNode, ElasticsearchMapping mapping) {
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
       RelNode previous = null;
       RelNode current = subQueryNode;
