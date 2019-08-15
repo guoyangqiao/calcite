@@ -223,7 +223,10 @@ class PredicateAnalyzer {
                               final RexNode condition = ((ElasticsearchFilter) esRoot).getCondition();
                               final Expression accept = condition.accept(this);
                               if (accept instanceof QueryExpression) {
-                                return QueryExpression.create((TerminalExpression) rexLiteral.accept(this)).hasChild((QueryExpression) accept);
+                                final TerminalExpression name = (TerminalExpression) rexLiteral.accept(this);
+                                final QueryExpression childExpression = (QueryExpression) accept;
+                                final QueryExpression queryExpression = QueryExpression.create(name).hasChild(childExpression);
+                                return queryExpression;
                               }
                             } else {
                               throw new PredicateAnalyzerException("Unsupported match all has child query");
