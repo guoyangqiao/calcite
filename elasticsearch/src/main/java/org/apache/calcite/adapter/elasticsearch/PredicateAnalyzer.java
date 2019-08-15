@@ -282,15 +282,19 @@ class PredicateAnalyzer {
               previous.replaceInput(0, current.getInput(0));
               current = current.getInput(0);
             } else {
+              previous.replaceInput(0, refinedFilter);
               current = refinedFilter.getInput(0);
             }
           } else {
             previous = current;
             current = current.getInput(0);
           }
+        } else {
+          previous = current;
+          current = current.getInput(0);
         }
       }
-      return new Pair<>(nameHolder.get(), finalRel);
+      return new Pair<>(nameHolder.get(), subQueryNode);
     }
 
     private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, AtomicReference<RelNode> shouldRemoveFilter, RelNode finalProbeFilter) {
