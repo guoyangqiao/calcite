@@ -746,6 +746,8 @@ class PredicateAnalyzer {
       return false;
     }
 
+    public abstract QueryExpression hasChild();
+
     /**
      * Negate {@code this} QueryExpression (not the next one).
      */
@@ -834,6 +836,10 @@ class PredicateAnalyzer {
       return partial;
     }
 
+    @Override
+    public QueryExpression hasChild() {
+      throw new PredicateAnalyzerException("Query semantic ['hasChild'] "
+          + "cannot be applied to a compound expression");    }
 
     @Override
     public QueryBuilder builder() {
@@ -939,6 +945,11 @@ class PredicateAnalyzer {
         throw new IllegalStateException("Builder was not initialized");
       }
       return builder;
+    }
+
+    @Override
+    public QueryExpression hasChild() {
+      return null;
     }
 
     @Override
