@@ -264,31 +264,39 @@ class PredicateAnalyzer {
      * @param mapping      use to see if the join type are ok, dammit!
      */
     private Pair<RexLiteral, RelNode> testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
-      RelNode modifiedRel = null;
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
-      for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
+      RelNode finalRel = subQueryNode;
+      RelNode probeFilter = subQueryNode;
+      RelNode previous = null;
+      while (probeFilter.getInputs().size() != 0) {
         if (probeFilter instanceof Filter) {
-          final AtomicBoolean shouldRemoveFilter = new AtomicBoolean(false);
-          probeFilter.accept(getShuttle(filterTest, mapping, nameHolder, shouldRemoveFilter, probeFilter));
-          if (shouldRemoveFilter.get()) {
-            RelNode previous = null;
-            RelNode current = null;
-            for (RelNode input = subQueryNode; input != probeFilter; input = input.getInput(0)) {
-              previous = input;
-              current = input.getInput(0);
-            }
-            if (previous == null) {
-              modifiedRel = probeFilter.getInput(0);
+          final AtomicReference<RelNode> modifiedFilterHolder = new AtomicReference<>(probeFilter);
+          probeFilter.accept(getShuttle(filterTest, mapping, nameHolder, modifiedFilterHolder, probeFilter));
+          final RelNode refinedFilter = modifiedFilterHolder.get();
+          if (refinedFilter != probeFilter) {
+            //must do something
+            if (refinedFilter == null) {
+              if (previous != null) {
+                previous.replaceInput(0, probeFilter.getInput(0));
+              } else {
+                finalRel = probeFilter.getInput(0);
+              }
             } else {
-              modifiedRel = previous.copy(previous.getTraitSet(), ImmutableList.of(current.getInput(0)));
+              if (previous != null) {
+                previous.replaceInput(0, refinedFilter);
+              } else {
+                finalRel = refinedFilter;
+              }
             }
           }
         }
+        previous = probeFilter;
+        probeFilter = probeFilter.getInput(0);
       }
-      return new Pair<>(nameHolder.get(), modifiedRel);
+      return new Pair<>(nameHolder.get(), finalRel);
     }
 
-    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, AtomicBoolean shouldRemoveFilter, RelNode finalProbeFilter) {
+    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, AtomicReference<RelNode> shouldRemoveFilter, RelNode finalProbeFilter) {
       final int initLayer = 1;
       final AtomicInteger depth = new AtomicInteger(initLayer);
       return new RexShuttle() {
