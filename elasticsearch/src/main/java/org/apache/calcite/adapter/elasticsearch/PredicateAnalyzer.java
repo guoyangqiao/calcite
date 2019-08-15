@@ -40,6 +40,7 @@ import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.Pair;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -199,7 +200,7 @@ class PredicateAnalyzer {
               if (relOptTables.size() == 1) {
                 final ElasticsearchTable elasticsearchTable = relOptTables.get(0).unwrap(ElasticsearchTable.class);
                 if (elasticsearchTable != null) {
-                  final RelNode subQueryNode = subQuery.rel;
+                  RelNode subQueryNode = subQuery.rel;
                   if (subQueryNode.getRowType().getFieldList().size() == 1) {
                     RelNode probeProject;
                     for (probeProject = subQueryNode; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
@@ -208,8 +209,12 @@ class PredicateAnalyzer {
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
-                        final RexLiteral rexLiteral = testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
+                        final Pair<RexLiteral, RelNode> rexLiteralRelNodePair = testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
+                          final RelNode right = rexLiteralRelNodePair.right;
+                          if (right != null) {
+                            subQueryNode = right;
+                          }
                           final EnumerableRel enumerableRel = implSubquery(subQueryNode);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
                             RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
@@ -223,7 +228,7 @@ class PredicateAnalyzer {
                               final RexNode condition = ((ElasticsearchFilter) esRoot).getCondition();
                               final Expression accept = condition.accept(this);
                               if (accept instanceof QueryExpression) {
-                                return new SimpleQueryExpression(null).hasChild((LiteralExpression) rexLiteral.accept(this), (QueryExpression) accept);
+                                return new SimpleQueryExpression(null).hasChild((LiteralExpression) rexLiteralRelNodePair.left.accept(this), (QueryExpression) accept);
                               }
                             } else {
                               throw new PredicateAnalyzerException("Unsupported match all has child query");
@@ -258,49 +263,61 @@ class PredicateAnalyzer {
      * @param subQueryNode query which will be used to test
      * @param mapping      use to see if the join type are ok, dammit!
      */
-    private RexLiteral testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
+    private Pair<RexLiteral, RelNode> testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
+      RelNode modifiedRel = null;
       final RexBuilder rexBuilder = subQueryNode.getCluster().getRexBuilder();
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
         if (probeFilter instanceof Filter) {
-          RelNode testFilter = probeFilter;
-          final AtomicInteger depth = new AtomicInteger(1);
-          probeFilter.accept(new RexShuttle() {
-            @Override
-            public RexNode visitCall(RexCall call) {
-              if (call.op.kind == SqlKind.EQUALS && depth.get() > 0 && !filterTest.get()) {
-                final RexNode ref = call.getOperands().get(0);
-                final RexNode rexNode = call.getOperands().get(1);
-                if (ref instanceof RexInputRef) {
-                  final int index = ((RexInputRef) ref).getIndex();
-                  testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
-                  if (filterTest.get()) {
-                    nameHolder.set(((RexLiteral) rexNode));
-                    if (depth.get() == 1) {
+          final int initLayer = 1;
+          final AtomicInteger depth = new AtomicInteger(initLayer);
+          final AtomicBoolean shouldRemoveFilter = new AtomicBoolean(false);
+          RelNode finalProbeFilter = probeFilter;
+          probeFilter.accept(getShuttle(filterTest, mapping, nameHolder, initLayer, depth, shouldRemoveFilter, finalProbeFilter));
+          if (shouldRemoveFilter.get()) {
+            RelNode previous = null;
+            RelNode current = null;
+            for (RelNode input = subQueryNode; input != probeFilter; input = input.getInput(0)) {
+              previous = input;
+              current = input.getInput(0);
+            }
+            if (previous == null) {
+              modifiedRel = probeFilter.getInput(0);
+            } else {
+              modifiedRel = previous.copy(previous.getTraitSet(), ImmutableList.of(current.getInput(0)));
+            }
+          }
+        }
+      }
+      return new Pair<>(nameHolder.get(), modifiedRel);
+    }
 
-                    }
-                  }
-                }
-              } else {
-                depth.decrementAndGet();
-                final List<RexNode> rexNodes = new LinkedList<>();
-                for (int i = 0; i < call.getOperands().size(); i++) {
-                  final RexNode operand = call.getOperands().get(i);
-                  final RexNode accept = operand.accept(this);
-                  if (accept != null) {
-                    rexNodes.add(accept);
-                  }
-                }
-                if (rexNodes.size() == 1) {
-                  return rexNodes.get(0);
-                } else {
+    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, int initLayer, AtomicInteger depth, AtomicBoolean shouldRemoveFilter, RelNode finalProbeFilter) {
+      return new RexShuttle() {
+        @Override
+        public RexNode visitCall(RexCall call) {
+          if (call.op.kind == SqlKind.EQUALS && depth.get() > 0 && !filterTest.get()) {
+            final RexNode ref = call.getOperands().get(0);
+            final RexNode rexNode = call.getOperands().get(1);
+            if (ref instanceof RexInputRef) {
+              final int index = ((RexInputRef) ref).getIndex();
+              testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
+              if (filterTest.get()) {
+                nameHolder.set(((RexLiteral) rexNode));
+                if (depth.get() == initLayer) {
+                  shouldRemoveFilter.set(true);
                 }
               }
             }
-          });
+          } else {
+            depth.decrementAndGet();
+            for (int i = 0; i < call.getOperands().size(); i++) {
+              final RexNode operand = call.getOperands().get(i);
+              final RexNode accept = operand.accept(this);
+            }
+          }
         }
-      }
-      return nameHolder.get();
+      };
     }
 
     private void testProjection(AtomicBoolean projectionTest, ElasticsearchMapping mapping, RelNode probeProject) {
