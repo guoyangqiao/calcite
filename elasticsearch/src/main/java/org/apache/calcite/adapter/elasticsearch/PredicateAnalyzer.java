@@ -202,12 +202,13 @@ class PredicateAnalyzer {
                   final RelNode subQueryNode = subQuery.rel;
                   if (subQueryNode.getRowType().getFieldList().size() == 1) {
                     RelNode probeProject;
-                    for (probeProject = subQueryNode; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0))
-                      ;
+                    for (probeProject = subQueryNode; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
+                      //ignore
+                    }
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
-                        final String name = testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
+                        final RexLiteral rexLiteral = testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
                           final EnumerableRel enumerableRel = implSubquery(subQueryNode);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
@@ -222,11 +223,10 @@ class PredicateAnalyzer {
                               final RexNode condition = ((ElasticsearchFilter) esRoot).getCondition();
                               final Expression accept = condition.accept(this);
                               if (accept instanceof QueryExpression) {
-                                System.out.println();
+                                return QueryExpression.create((TerminalExpression) rexLiteral.accept(this)).hasChild((QueryExpression) accept);
                               }
-//                              QueryBuilders.hasChild(,accept);
                             } else {
-//                              QueryBuilders.hasChild();
+                              throw new PredicateAnalyzerException("Unsupported match all has child query");
                             }
                           }
                         }
@@ -258,8 +258,8 @@ class PredicateAnalyzer {
      * @param subQueryNode query which will be used to test
      * @param mapping      use to see if the join type are ok, dammit!
      */
-    private String testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
-      final AtomicReference<String> nameHolder = new AtomicReference<>();
+    private RexLiteral testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
+      final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
         if (probeFilter instanceof Filter) {
           RelNode testFilter = probeFilter;
@@ -275,7 +275,7 @@ class PredicateAnalyzer {
                   if (!filterTest.get() && depth.decrementAndGet() >= 0) {
                     testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
                     if (filterTest.get()) {
-                      nameHolder.set(((RexLiteral) rexNode).getValueAs(String.class));
+                      nameHolder.set(((RexLiteral) rexNode));
                     }
                   }
 
@@ -725,16 +725,6 @@ class PredicateAnalyzer {
   interface Expression {
   }
 
-  static class HasChildExpression implements Expression {
-    private HasChildQueryBuilder hasChildQueryBuilder;
-
-    public static HasChildExpression create(QueryExpression expression) {
-      final HasChildExpression hasChildExpression = new HasChildExpression();
-      final ConstantScoreQueryBuilder constantScoreQueryBuilder = QueryBuilders.constantScoreQuery(null);
-      return null;
-    }
-  }
-
   /**
    * Main expression operators (like {@code equals}, {@code gt}, {@code exists} etc.)
    */
@@ -746,7 +736,7 @@ class PredicateAnalyzer {
       return false;
     }
 
-    public abstract QueryExpression hasChild();
+    public abstract QueryExpression hasChild(QueryExpression accept);
 
     /**
      * Negate {@code this} QueryExpression (not the next one).
@@ -837,7 +827,7 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression hasChild() {
+    public QueryExpression hasChild(QueryExpression accept) {
       throw new PredicateAnalyzerException("Query semantic ['hasChild'] "
           + "cannot be applied to a compound expression");
     }
@@ -949,8 +939,9 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression hasChild() {
-      return null;
+    public QueryExpression hasChild(QueryExpression childQuery) {
+      builder = QueryBuilders.hasChild(rel.name, childQuery.builder());
+      return this;
     }
 
     @Override
