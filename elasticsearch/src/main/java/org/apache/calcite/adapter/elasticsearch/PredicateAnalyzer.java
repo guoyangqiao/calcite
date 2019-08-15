@@ -203,7 +203,7 @@ class PredicateAnalyzer {
               if (relOptTables.size() == 1) {
                 final ElasticsearchTable elasticsearchTable = relOptTables.get(0).unwrap(ElasticsearchTable.class);
                 if (elasticsearchTable != null) {
-                  RelNode subQueryNode = subQuery.rel;
+                  final RelNode subQueryNode = subQuery.rel;
                   if (subQueryNode.getRowType().getFieldList().size() == 1) {
                     RelNode probeProject;
                     for (probeProject = subQueryNode; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
@@ -212,11 +212,12 @@ class PredicateAnalyzer {
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
-                        subQueryNode = RelFactories.LOGICAL_BUILDER.create(subQueryNode.getCluster(), null).push(subQueryNode).project(subQueryNode.getCluster().getRexBuilder().identityProjects(subQueryNode.getRowType())).build();
-                        final Pair<RexLiteral, RelNode> rexLiteralRelNodePair = testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
+                        final Pair<RexLiteral, RelNode> rexLiteralRelNodePair = testFilter(
+                            filterTest,
+                            RelFactories.LOGICAL_BUILDER.create(subQueryNode.getCluster(), null).push(subQueryNode).project(subQueryNode.getCluster().getRexBuilder().identityProjects(subQueryNode.getRowType())).build(),
+                            elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
-                          subQueryNode = rexLiteralRelNodePair.right.getInput(0);
-                          final EnumerableRel enumerableRel = implSubquery(subQueryNode);
+                          final EnumerableRel enumerableRel = implSubquery(rexLiteralRelNodePair.right.getInput(0));
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
                             RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
                             while (!(esRoot instanceof Filter)) {
