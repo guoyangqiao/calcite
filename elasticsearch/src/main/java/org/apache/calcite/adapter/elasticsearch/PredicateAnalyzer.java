@@ -31,6 +31,8 @@ import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
@@ -40,6 +42,7 @@ import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.Pair;
 
 import java.util.*;
@@ -264,35 +267,28 @@ class PredicateAnalyzer {
      * @param mapping      use to see if the join type are ok, dammit!
      */
     private Pair<RexLiteral, RelNode> testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
+      subQueryNode = RelFactories.LOGICAL_BUILDER.create(subQueryNode.getCluster(), null).push(subQueryNode).project(subQueryNode.getCluster().getRexBuilder().identityProjects(subQueryNode.getRowType())).build();
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
-      RelNode finalRel = subQueryNode;
-      RelNode probeFilter = subQueryNode;
       RelNode previous = null;
-      while (probeFilter.getInputs().size() != 0) {
-        if (probeFilter instanceof Filter) {
-          final AtomicReference<RelNode> modifiedFilterHolder = new AtomicReference<>(probeFilter);
-          probeFilter.accept(getShuttle(filterTest, mapping, nameHolder, modifiedFilterHolder, probeFilter));
+      RelNode current = subQueryNode;
+      while (current.getInputs().size() != 0) {
+        if (current instanceof Filter) {
+          assert previous != null;
+          final AtomicReference<RelNode> modifiedFilterHolder = new AtomicReference<>(current);
+          current.accept(getShuttle(filterTest, mapping, nameHolder, modifiedFilterHolder, current));
           final RelNode refinedFilter = modifiedFilterHolder.get();
-          if (refinedFilter != probeFilter) {
+          if (refinedFilter != current) {
             //must do something
             if (refinedFilter == null) {
-              if (previous != null) {
-                previous.replaceInput(0, probeFilter.getInput(0));
-              } else {
-                finalRel = probeFilter.getInput(0);
-              }
-              probeFilter = probeFilter.getInput(0);
+              previous.replaceInput(0, current.getInput(0));
+              current = current.getInput(0);
             } else {
-              if (previous != null) {
-                previous.replaceInput(0, refinedFilter);
-              } else {
-                finalRel = refinedFilter;
-              }
+              previous = refinedFilter;
+              current = refinedFilter.getInput(0);
             }
           }
         }
-        previous = probeFilter;
-        probeFilter = probeFilter.getInput(0);
+
       }
       return new Pair<>(nameHolder.get(), finalRel);
     }
