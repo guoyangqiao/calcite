@@ -294,7 +294,7 @@ class PredicateAnalyzer {
       return new RexShuttle() {
         @Override
         public RexNode visitCall(RexCall call) {
-          if (call.op.kind == SqlKind.EQUALS && depth.get() > 0 && !filterTest.get()) {
+          if (call.op.kind == SqlKind.EQUALS && depth.get() >= 0 && !filterTest.get()) {
             final RexNode ref = call.getOperands().get(0);
             final RexNode rexNode = call.getOperands().get(1);
             if (ref instanceof RexInputRef) {
