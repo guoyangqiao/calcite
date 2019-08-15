@@ -265,15 +265,11 @@ class PredicateAnalyzer {
      */
     private Pair<RexLiteral, RelNode> testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
       RelNode modifiedRel = null;
-      final RexBuilder rexBuilder = subQueryNode.getCluster().getRexBuilder();
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
         if (probeFilter instanceof Filter) {
-          final int initLayer = 1;
-          final AtomicInteger depth = new AtomicInteger(initLayer);
           final AtomicBoolean shouldRemoveFilter = new AtomicBoolean(false);
-          RelNode finalProbeFilter = probeFilter;
-          probeFilter.accept(getShuttle(filterTest, mapping, nameHolder, initLayer, depth, shouldRemoveFilter, finalProbeFilter));
+          probeFilter.accept(getShuttle(filterTest, mapping, nameHolder, shouldRemoveFilter, probeFilter));
           if (shouldRemoveFilter.get()) {
             RelNode previous = null;
             RelNode current = null;
@@ -292,7 +288,9 @@ class PredicateAnalyzer {
       return new Pair<>(nameHolder.get(), modifiedRel);
     }
 
-    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, int initLayer, AtomicInteger depth, AtomicBoolean shouldRemoveFilter, RelNode finalProbeFilter) {
+    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, AtomicBoolean shouldRemoveFilter, RelNode finalProbeFilter) {
+      final int initLayer = 1;
+      final AtomicInteger depth = new AtomicInteger(initLayer);
       return new RexShuttle() {
         @Override
         public RexNode visitCall(RexCall call) {
@@ -306,15 +304,15 @@ class PredicateAnalyzer {
                 nameHolder.set(((RexLiteral) rexNode));
                 if (depth.get() == initLayer) {
                   shouldRemoveFilter.set(true);
+                } else {
+                  return null;
                 }
               }
             }
+            return call;
           } else {
             depth.decrementAndGet();
-            for (int i = 0; i < call.getOperands().size(); i++) {
-              final RexNode operand = call.getOperands().get(i);
-              final RexNode accept = operand.accept(this);
-            }
+            return call.clone(call.getType(), call.getOperands().stream().map(x -> x.accept(this)).filter(Objects::nonNull).collect(Collectors.toList()));
           }
         }
       };
