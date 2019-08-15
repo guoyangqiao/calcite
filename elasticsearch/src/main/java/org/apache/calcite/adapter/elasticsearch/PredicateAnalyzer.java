@@ -219,8 +219,6 @@ class PredicateAnalyzer {
                           final EnumerableRel enumerableRel = implSubquery(subQueryNode);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
                             RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
-                            final ElasticsearchRel.Implementor implementor = new ElasticsearchRel.Implementor();
-                            ((ElasticsearchRel) esRoot).implement(implementor);
                             while (!(esRoot instanceof Filter)) {
                               //only use the first filter
                               esRoot = esRoot.getInput(0);
