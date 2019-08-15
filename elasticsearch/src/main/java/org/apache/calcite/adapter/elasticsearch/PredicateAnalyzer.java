@@ -212,9 +212,10 @@ class PredicateAnalyzer {
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
+                        final RelNode boxedRel = RelFactories.LOGICAL_BUILDER.create(subQueryNode.getCluster(), null).push(subQueryNode).project(subQueryNode.getCluster().getRexBuilder().identityProjects(subQueryNode.getRowType())).build();
                         final Pair<RexLiteral, RelNode> rexLiteralRelNodePair = testFilter(
                             filterTest,
-                            RelFactories.LOGICAL_BUILDER.create(subQueryNode.getCluster(), null).push(subQueryNode).project(subQueryNode.getCluster().getRexBuilder().identityProjects(subQueryNode.getRowType())).build(),
+                            boxedRel,
                             elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
                           final EnumerableRel enumerableRel = implSubquery(rexLiteralRelNodePair.right.getInput(0));
