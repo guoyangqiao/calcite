@@ -212,12 +212,10 @@ class PredicateAnalyzer {
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
+                        subQueryNode = RelFactories.LOGICAL_BUILDER.create(subQueryNode.getCluster(), null).push(subQueryNode).project(subQueryNode.getCluster().getRexBuilder().identityProjects(subQueryNode.getRowType())).build();
                         final Pair<RexLiteral, RelNode> rexLiteralRelNodePair = testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
-                          final RelNode right = rexLiteralRelNodePair.right;
-                          if (right != null) {
-                            subQueryNode = right;
-                          }
+                          subQueryNode = rexLiteralRelNodePair.right.getInput(0);
                           final EnumerableRel enumerableRel = implSubquery(subQueryNode);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
                             RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
@@ -267,7 +265,6 @@ class PredicateAnalyzer {
      * @param mapping      use to see if the join type are ok, dammit!
      */
     private Pair<RexLiteral, RelNode> testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
-      subQueryNode = RelFactories.LOGICAL_BUILDER.create(subQueryNode.getCluster(), null).push(subQueryNode).project(subQueryNode.getCluster().getRexBuilder().identityProjects(subQueryNode.getRowType())).build();
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
       RelNode previous = null;
       RelNode current = subQueryNode;
