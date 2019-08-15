@@ -259,6 +259,7 @@ class PredicateAnalyzer {
      * @param mapping      use to see if the join type are ok, dammit!
      */
     private RexLiteral testFilter(AtomicBoolean filterTest, RelNode subQueryNode, ElasticsearchMapping mapping) {
+      final RexBuilder rexBuilder = subQueryNode.getCluster().getRexBuilder();
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
       for (RelNode probeFilter = subQueryNode; probeFilter.getInputs().size() != 0; probeFilter = probeFilter.getInput(0)) {
         if (probeFilter instanceof Filter) {
@@ -267,34 +268,34 @@ class PredicateAnalyzer {
           probeFilter.accept(new RexShuttle() {
             @Override
             public RexNode visitCall(RexCall call) {
-              if (call.op.kind == SqlKind.EQUALS) {
+              if (call.op.kind == SqlKind.EQUALS && depth.get() > 0 && !filterTest.get()) {
                 final RexNode ref = call.getOperands().get(0);
                 final RexNode rexNode = call.getOperands().get(1);
                 if (ref instanceof RexInputRef) {
                   final int index = ((RexInputRef) ref).getIndex();
-                  if (!filterTest.get() && depth.decrementAndGet() >= 0) {
-                    testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
-                    if (filterTest.get()) {
-                      nameHolder.set(((RexLiteral) rexNode));
-                      return null;
+                  testFieldAccess(index, NAME_FIELD, testFilter, mapping, filterTest);
+                  if (filterTest.get()) {
+                    nameHolder.set(((RexLiteral) rexNode));
+                    if (depth.get() == 1) {
+
                     }
                   }
-
                 }
               } else {
+                depth.decrementAndGet();
                 final List<RexNode> rexNodes = new LinkedList<>();
                 for (int i = 0; i < call.getOperands().size(); i++) {
                   final RexNode operand = call.getOperands().get(i);
                   final RexNode accept = operand.accept(this);
-                  if (operand != accept && accept != null) {
+                  if (accept != null) {
                     rexNodes.add(accept);
                   }
                 }
                 if (rexNodes.size() == 1) {
                   return rexNodes.get(0);
+                } else {
                 }
               }
-              return call;
             }
           });
         }
