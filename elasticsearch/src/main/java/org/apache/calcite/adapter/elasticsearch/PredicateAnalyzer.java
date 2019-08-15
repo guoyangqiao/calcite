@@ -281,6 +281,7 @@ class PredicateAnalyzer {
               } else {
                 finalRel = probeFilter.getInput(0);
               }
+              probeFilter = probeFilter.getInput(0);
             } else {
               if (previous != null) {
                 previous.replaceInput(0, refinedFilter);
