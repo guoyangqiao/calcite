@@ -223,9 +223,9 @@ class PredicateAnalyzer {
                               final RexNode condition = ((ElasticsearchFilter) esRoot).getCondition();
                               final Expression accept = condition.accept(this);
                               if (accept instanceof QueryExpression) {
-                                final TerminalExpression name = (TerminalExpression) rexLiteral.accept(this);
+                                final LiteralExpression name = (LiteralExpression) rexLiteral.accept(this);
                                 final QueryExpression childExpression = (QueryExpression) accept;
-                                final QueryExpression queryExpression = QueryExpression.hasChild(name, childExpression);
+                                final QueryExpression queryExpression = new SimpleQueryExpression(null).hasChild(name, childExpression);
                                 return queryExpression;
                               }
                             } else {
