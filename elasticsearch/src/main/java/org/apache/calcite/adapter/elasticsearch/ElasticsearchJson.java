@@ -104,7 +104,8 @@ final class ElasticsearchJson {
 
     if (mapping.has("type")) {
       // this is leaf (register field / type mapping)
-      consumer.accept(String.join(".", path), mapping);
+      consumer.accept(path.getLast(), mapping);
+//      consumer.accept(String.join(".", path), mapping);
       return;
     }
 
