@@ -282,9 +282,14 @@ class PredicateAnalyzer {
         return copy(values);
       }
 
+      /**
+       * copy a filter entirely
+       *
+       * @param filter original filter
+       */
       @Override
       public RelNode visit(LogicalFilter filter) {
-        return copy(filter);
+        return filter.copy(filter.getTraitSet(), filter.getInput(), filter.getCluster().getRexBuilder().copy(filter.getCondition()));
       }
 
       @Override
