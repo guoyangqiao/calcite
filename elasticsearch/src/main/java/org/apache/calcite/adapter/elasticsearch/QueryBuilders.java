@@ -524,6 +524,13 @@ class QueryBuilders {
       this.childQuery = childQuery;
     }
 
+    /**
+     * "min_children": 0,
+     * "max_children": 2147483647,
+     *
+     * @param generator used to generate JSON elements
+     * @throws IOException
+     */
     @Override
     void writeJson(JsonGenerator generator) throws IOException {
       generator.writeStartObject();
@@ -534,6 +541,10 @@ class QueryBuilders {
       generator.writeFieldName("query");
       childQuery.writeJson(generator);
       generator.writeEndObject();
+      generator.writeFieldName("max_children");
+      generator.writeNumber(0X7FFFFFFF);
+      generator.writeFieldName("min_children");
+      generator.writeNumber(0);
       generator.writeEndObject();
     }
   }
