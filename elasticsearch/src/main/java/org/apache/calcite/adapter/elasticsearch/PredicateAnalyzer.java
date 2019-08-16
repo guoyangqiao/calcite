@@ -246,7 +246,7 @@ class PredicateAnalyzer {
     }
 
     /**
-     * copy relnode
+     * copy relNode
      */
     static class RelCopyShuttle extends RelShuttleImpl {
       static RelNode copyOf(RelNode relNode) {
