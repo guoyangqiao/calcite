@@ -329,7 +329,7 @@ class PredicateAnalyzer {
 
       @Override
       public RelNode visit(RelNode other) {
-        return super.visit(other);
+        return copy(other);
       }
     }
 
