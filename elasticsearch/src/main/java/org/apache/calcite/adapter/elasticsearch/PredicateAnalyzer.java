@@ -258,8 +258,8 @@ class PredicateAnalyzer {
         return copy(aggregate);
       }
 
-      private RelNode copy(RelNode aggregate) {
-        return aggregate.copy(aggregate.getTraitSet(), aggregate.getInputs());
+      private RelNode copy(RelNode relNode) {
+        return relNode.copy(relNode.getTraitSet(), relNode.getInputs());
       }
 
       @Override
