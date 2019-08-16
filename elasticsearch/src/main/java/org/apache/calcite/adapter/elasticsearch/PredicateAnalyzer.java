@@ -24,16 +24,13 @@ import org.apache.calcite.adapter.elasticsearch.QueryBuilders.QueryBuilder;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.RangeQueryBuilder;
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
 import org.apache.calcite.adapter.enumerable.EnumerableRel;
-import org.apache.calcite.plan.ConventionTraitDef;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Filter;
-import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.RelShuttleImpl;
+import org.apache.calcite.rel.core.*;
+import org.apache.calcite.rel.logical.*;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
@@ -203,7 +200,7 @@ class PredicateAnalyzer {
               if (relOptTables.size() == 1) {
                 final ElasticsearchTable elasticsearchTable = relOptTables.get(0).unwrap(ElasticsearchTable.class);
                 if (elasticsearchTable != null) {
-                  final RelNode subQueryNode = subQuery.rel;
+                  final RelNode subQueryNode = RelCopyShuttle.copyOf(subQuery.rel);
                   if (subQueryNode.getRowType().getFieldList().size() == 1) {
                     RelNode probeProject;
                     for (probeProject = subQueryNode; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
@@ -246,6 +243,94 @@ class PredicateAnalyzer {
         }
       }
       return super.visitSubQuery(subQuery);
+    }
+
+    /**
+     * copy relnode
+     */
+    static class RelCopyShuttle extends RelShuttleImpl {
+      static RelNode copyOf(RelNode relNode) {
+        return new RelCopyShuttle().visit(relNode);
+      }
+
+      @Override
+      public RelNode visit(LogicalAggregate aggregate) {
+        return copy(aggregate);
+      }
+
+      private RelNode copy(RelNode aggregate) {
+        return aggregate.copy(aggregate.getTraitSet(), aggregate.getInputs());
+      }
+
+      @Override
+      public RelNode visit(LogicalMatch match) {
+        return copy(match);
+      }
+
+      @Override
+      public RelNode visit(TableScan scan) {
+        return copy(scan);
+      }
+
+      @Override
+      public RelNode visit(TableFunctionScan scan) {
+        return copy(scan);
+      }
+
+      @Override
+      public RelNode visit(LogicalValues values) {
+        return copy(values);
+      }
+
+      @Override
+      public RelNode visit(LogicalFilter filter) {
+        return copy(filter);
+      }
+
+      @Override
+      public RelNode visit(LogicalProject project) {
+        return copy(project);
+      }
+
+      @Override
+      public RelNode visit(LogicalJoin join) {
+        return copy(join);
+      }
+
+      @Override
+      public RelNode visit(LogicalCorrelate correlate) {
+        return copy(correlate);
+      }
+
+      @Override
+      public RelNode visit(LogicalUnion union) {
+        return copy(union);
+      }
+
+      @Override
+      public RelNode visit(LogicalIntersect intersect) {
+        return copy(intersect);
+      }
+
+      @Override
+      public RelNode visit(LogicalMinus minus) {
+        return copy(minus);
+      }
+
+      @Override
+      public RelNode visit(LogicalSort sort) {
+        return copy(sort);
+      }
+
+      @Override
+      public RelNode visit(LogicalExchange exchange) {
+        return copy(exchange);
+      }
+
+      @Override
+      public RelNode visit(RelNode other) {
+        return super.visit(other);
+      }
     }
 
     private EnumerableRel implSubquery(RelNode relNode) {
