@@ -313,7 +313,7 @@ class ElasticsearchRules {
   /**
    * Rule to modify {@link ElasticsearchFilter} condition.
    * Implemented:
-   * a field with LIKEs to single MATCH using OR
+   * a field with LIKEs to single MATCH
    */
   private static class ElasticsearchFilterLikeToMatchModificationRule extends RelOptRule {
     private static final ElasticsearchFilterLikeToMatchModificationRule INSTANCE = new ElasticsearchFilterLikeToMatchModificationRule();
