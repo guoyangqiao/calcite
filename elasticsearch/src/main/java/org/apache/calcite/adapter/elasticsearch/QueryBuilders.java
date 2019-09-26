@@ -191,7 +191,7 @@ class QueryBuilders {
    * @param text     The content to be analyzed
    * @param operator Operator, must be one of ["and", "or"]
    */
-  public static MatchQueryBuilder match(String name, Object text, String operator) {
+  static MatchQueryBuilder match(String name, Object text, String operator) {
     return new MatchQueryBuilder(name, text, operator, 1);
   }
 
