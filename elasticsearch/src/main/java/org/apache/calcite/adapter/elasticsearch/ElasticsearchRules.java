@@ -311,8 +311,9 @@ class ElasticsearchRules {
   }
 
   /**
-   * Rule to convert a {@link org.apache.calcite.rel.core.Sort} to an
-   * {@link ElasticsearchSort}.
+   * Rule to modify {@link ElasticsearchFilter} condition.
+   * Implemented:
+   * same field LIKE to MATCH using OR
    */
   private static class ElasticsearchFilterLikeToMatchModificationRule extends RelOptRule {
     private static final ElasticsearchFilterLikeToMatchModificationRule INSTANCE = new ElasticsearchFilterLikeToMatchModificationRule();
@@ -323,6 +324,8 @@ class ElasticsearchRules {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
+      final ElasticsearchFilter rel = call.rel(0);
+      final RexNode condition = rel.getCondition();
 
     }
   }
