@@ -467,14 +467,16 @@ class QueryBuilders {
      * Value should wrapped with "%"
      */
     private boolean fullTextLike(String value) {
-      return value.startsWith("%") && value.endsWith("%");
+      return true;
+//      return value.startsWith("%") && value.endsWith("%");
     }
 
     /**
      * Value should not make analyzer work
      */
     private boolean pureValue(String value) {
-      return !value.contains(" ") && !value.contains("|");
+      return true;
+//      return !value.contains(" ") && !value.contains("|");
     }
 
     @Override
