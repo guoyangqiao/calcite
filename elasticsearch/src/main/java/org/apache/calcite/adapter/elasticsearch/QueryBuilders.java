@@ -443,7 +443,7 @@ class QueryBuilders {
 
   /**
    * A Query that does fuzzy matching for a specific value.
-   * We assume that the value would not trigger the analyzer work
+   * We assume that the value would not trigger the analyzer work which means there is character such as whitespace
    */
   static class RegexpQueryBuilder extends QueryBuilder {
     private MatchQueryBuilder matchQueryBuilder;
