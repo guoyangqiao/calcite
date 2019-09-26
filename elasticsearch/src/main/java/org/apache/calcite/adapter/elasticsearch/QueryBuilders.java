@@ -443,7 +443,8 @@ class QueryBuilders {
 
   /**
    * A Query that does fuzzy matching for a specific value.
-   * We assume that the value would not trigger the analyzer work which means there is character such as whitespace in the value
+   * We assume that the value would not trigger the analyzer work which means there is character such as whitespace in the value,
+   * so "%foo%" can be used, but "%foo", "bar%", "%foo bar%" will not be allowed now.
    */
   static class RegexpQueryBuilder extends QueryBuilder {
     private MatchQueryBuilder matchQueryBuilder;
@@ -452,8 +453,9 @@ class QueryBuilders {
       if (!fullTextLike(value)) {
         throw new RuntimeException("LIKE currently only support full text alike query");
       }
-      ;
-      assert pureValue(value);
+      if (!pureValue(value)) {
+        throw new RuntimeException("LIKE currently not compatible with analyzer");
+      }
       this.matchQueryBuilder = QueryBuilders.match(fieldName, value, ElasticsearchConstants.AND);
     }
 
