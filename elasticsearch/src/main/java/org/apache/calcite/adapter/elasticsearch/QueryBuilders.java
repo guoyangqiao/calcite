@@ -461,9 +461,6 @@ class QueryBuilders {
 
     /**
      * If value split with whitespace and are words, we identified words' relation as OR, otherwise AND
-     *
-     * @param value
-     * @return
      */
     private String defineOperator(String value) {
       String operator;
