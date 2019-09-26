@@ -17,6 +17,8 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+import org.apache.calcite.sql.SqlBinaryOperator;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -181,6 +183,17 @@ class QueryBuilders {
    */
   static MatchAllQueryBuilder matchAll() {
     return new MatchAllQueryBuilder();
+  }
+
+  /**
+   * A query that matches on condition.
+   * Currently we only support <b>OR</b>
+   *
+   * @param name The name of the field
+   * @param text The content to be analyzed
+   */
+  static MatchQueryBuilder match(String name, Object text) {
+    return new MatchQueryBuilder(SqlStdOperatorTable.OR, 1);
   }
 
   /**
@@ -512,6 +525,25 @@ class QueryBuilders {
       generator.writeStartObject();
       generator.writeEndObject();
       generator.writeEndObject();
+    }
+  }
+
+  static class MatchQueryBuilder extends QueryBuilder {
+
+    private final SqlBinaryOperator operator;
+    private final long minimumShouldMatch;
+
+    private MatchQueryBuilder(SqlBinaryOperator operator, long minimumShouldMatch) {
+      if ((!SqlStdOperatorTable.AND.equals(operator) && !SqlStdOperatorTable.OR.equals(operator))) {
+        throw new RuntimeException("Match query can use only AND OR");
+      }
+      this.operator = operator;
+      this.minimumShouldMatch = minimumShouldMatch;
+    }
+
+    @Override
+    void writeJson(JsonGenerator generator) throws IOException {
+
     }
   }
 
