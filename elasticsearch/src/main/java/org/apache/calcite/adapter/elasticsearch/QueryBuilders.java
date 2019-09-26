@@ -446,20 +446,15 @@ class QueryBuilders {
    * We assume that the value would not trigger the analyzer work
    */
   static class RegexpQueryBuilder extends QueryBuilder {
-    private final String fieldName;
-    private final String value;
     private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
-      this.fieldName = fieldName;
-      this.value = value;
-      QueryBuilders.match(fieldName, value, ElasticsearchConstants.AND);
-      MatchQueryBuilder
+      this.matchQueryBuilder = QueryBuilders.match(fieldName, value, ElasticsearchConstants.AND);
     }
 
     @Override
     void writeJson(final JsonGenerator generator) throws IOException {
-
+      this.matchQueryBuilder.writeJson(generator);
     }
   }
 
