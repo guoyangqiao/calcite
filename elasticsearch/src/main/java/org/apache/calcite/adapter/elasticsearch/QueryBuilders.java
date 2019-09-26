@@ -455,29 +455,7 @@ class QueryBuilders {
     private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
-      if (!fullTextLike(value)) {
-        throw new RuntimeException("LIKE currently only support full text alike query");
-      }
-      if (!pureValue(value)) {
-        throw new RuntimeException("LIKE currently not compatible with analyzer");
-      }
       this.matchQueryBuilder = match(fieldName, value, ElasticsearchConstants.AND);
-    }
-
-    /**
-     * Value should wrapped with "%"
-     */
-    private boolean fullTextLike(String value) {
-      return true;
-//      return value.startsWith("%") && value.endsWith("%");
-    }
-
-    /**
-     * Value should not make analyzer work
-     */
-    private boolean pureValue(String value) {
-      return true;
-//      return !value.contains(" ") && !value.contains("|");
     }
 
     @Override
