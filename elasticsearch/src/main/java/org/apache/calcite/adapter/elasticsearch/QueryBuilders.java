@@ -192,8 +192,8 @@ class QueryBuilders {
    * @param name The name of the field
    * @param text The content to be analyzed
    */
-  static MatchQueryBuilder match(String name, Object text) {
-    return new MatchQueryBuilder(SqlStdOperatorTable.OR, 1);
+  static MatchQueryBuilder match(String name, Object text, String operator) {
+    return new MatchQueryBuilder(name, text, operator, 1);
   }
 
   /**
@@ -530,11 +530,15 @@ class QueryBuilders {
 
   static class MatchQueryBuilder extends QueryBuilder {
 
-    private final SqlBinaryOperator operator;
+    private final String operator;
     private final long minimumShouldMatch;
+    private final String name;
+    private final Object text;
 
-    private MatchQueryBuilder(SqlBinaryOperator operator, long minimumShouldMatch) {
-      if ((!SqlStdOperatorTable.AND.equals(operator) && !SqlStdOperatorTable.OR.equals(operator))) {
+    private MatchQueryBuilder(String name, Object text, String operator, long minimumShouldMatch) {
+      this.name = name;
+      this.text = text;
+      if ((!ElasticsearchConstants.AND.equals(operator) && !ElasticsearchConstants.OR.equals(operator))) {
         throw new RuntimeException("Match query can use only AND OR");
       }
       this.operator = operator;
@@ -543,7 +547,20 @@ class QueryBuilders {
 
     @Override
     void writeJson(JsonGenerator generator) throws IOException {
-
+      generator.writeStartObject();
+      generator.writeFieldName("match");
+      generator.writeStartObject();
+      generator.writeFieldName(name);
+      generator.writeStartObject();
+      generator.writeFieldName("query");
+      generator.writeObject(text);
+      generator.writeFieldName("operator");
+      generator.writeString(operator);
+      generator.writeFieldName("minimum_should_match");
+      generator.writeNumber(minimumShouldMatch);
+      generator.writeEndObject();
+      generator.writeEndObject();
+      generator.writeEndObject();
     }
   }
 

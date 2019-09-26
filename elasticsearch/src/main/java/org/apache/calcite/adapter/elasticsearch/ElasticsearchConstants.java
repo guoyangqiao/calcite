@@ -24,7 +24,8 @@ import java.util.Set;
  * Internal constants referenced in this package.
  */
 interface ElasticsearchConstants {
-
+  String AND = "and";
+  String OR = "or";
   String INDEX = "_index";
   String TYPE = "_type";
   String FIELDS = "fields";
@@ -33,6 +34,7 @@ interface ElasticsearchConstants {
 
   /**
    * Attribute which uniquely identifies a document (ID)
+   *
    * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-id-field.html">ID Field</a>
    */
   String ID = "_id";
@@ -42,6 +44,7 @@ interface ElasticsearchConstants {
 
   /**
    * Detects {@code select * from elastic} types of field name (select star).
+   *
    * @param name name of the field
    * @return {@code true} if this field represents whole raw, {@code false} otherwise
    */
