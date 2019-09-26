@@ -460,7 +460,7 @@ class QueryBuilders {
       if (!pureValue(value)) {
         throw new RuntimeException("LIKE currently not compatible with analyzer");
       }
-      this.matchQueryBuilder = QueryBuilders.match(fieldName, value, ElasticsearchConstants.AND);
+      this.matchQueryBuilder = match(fieldName, value, ElasticsearchConstants.AND);
     }
 
     /**
