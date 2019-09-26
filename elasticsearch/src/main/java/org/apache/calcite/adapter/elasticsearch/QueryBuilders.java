@@ -455,13 +455,24 @@ class QueryBuilders {
     private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
+      String operator = defineOperator(value);
+      this.matchQueryBuilder = match(fieldName, value, operator);
+    }
+
+    /**
+     * If value split with whitespace and are words, we identified words' relation as OR, otherwise AND
+     *
+     * @param value
+     * @return
+     */
+    private String defineOperator(String value) {
       String operator;
       if (value.startsWith("%") || value.endsWith("%")) {
         operator = ElasticsearchConstants.AND;
       } else {
         operator = ElasticsearchConstants.OR;
       }
-      this.matchQueryBuilder = match(fieldName, value, ElasticsearchConstants.AND);
+      return operator;
     }
 
     @Override
