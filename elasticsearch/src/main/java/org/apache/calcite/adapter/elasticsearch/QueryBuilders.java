@@ -455,8 +455,7 @@ class QueryBuilders {
     private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
-      String operator = defineOperator(value);
-      this.matchQueryBuilder = match(fieldName, value, operator);
+      this.matchQueryBuilder = match(fieldName, value, defineOperator(value));
     }
 
     /**
