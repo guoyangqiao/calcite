@@ -449,8 +449,11 @@ class QueryBuilders {
     private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
+      if (!fullTextLike(value)) {
+        throw new RuntimeException("LIKE currently only support full text alike query");
+      }
+      ;
       assert pureValue(value);
-      assert fullTextLike(value);
       this.matchQueryBuilder = QueryBuilders.match(fieldName, value, ElasticsearchConstants.AND);
     }
 
@@ -542,6 +545,9 @@ class QueryBuilders {
     }
   }
 
+  /**
+   * A query that matches on condition
+   */
   static class MatchQueryBuilder extends QueryBuilder {
 
     private final String operator;
