@@ -322,17 +322,18 @@ class ElasticsearchRules {
     @Override
     public void onMatch(RelOptRuleCall call) {
       final ElasticsearchFilter rel = call.rel(0);
-      final RexNode condition = rel.getCondition();
-      new RexShuttle() {
+      final RexShuttle shuttle = new RexShuttle() {
         @Override
         public RexNode visitCall(RexCall call) {
           final SqlOperator operator = call.getOperator();
           if (SqlStdOperatorTable.AND.equals(operator) || SqlStdOperatorTable.OR.equals(operator)) {
             final List<RexNode> conditionGroup = call.getOperands();
+
           }
           return super.visitCall(call);
         }
-      }
+      };
+      rel.accept(shuttle);
     }
   }
 
