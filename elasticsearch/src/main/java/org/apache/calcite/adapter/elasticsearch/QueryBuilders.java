@@ -445,7 +445,7 @@ class QueryBuilders {
    * A Query that does fuzzy matching for a specific value.
    * We treat fuzzy matching equals ES match which is not the RIGHT way.
    * We recommend that use LIKE to match fulltext single word math such as "%foo%".
-   * "%foo" "bar%" "%foo bar%" will lead to unexpected result
+   * "%foo" "bar%" "%foo bar%" may lead to unexpected result
    * <p>
    * Case 1: "foo ba%", match_phrase_prefix
    * Case 2: "%foo bar", not found
