@@ -19,10 +19,7 @@ package org.apache.calcite.adapter.elasticsearch;
 import org.apache.calcite.adapter.enumerable.RexImpTable;
 import org.apache.calcite.adapter.enumerable.RexToLixTranslator;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
-import org.apache.calcite.plan.Convention;
-import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.plan.RelTrait;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
@@ -59,10 +56,13 @@ class ElasticsearchRules {
       ElasticsearchAggregateRule.INSTANCE
   };
 
-  private ElasticsearchRules() {}
+  private ElasticsearchRules() {
+  }
+
 
   /**
    * Returns 'string' if it is a call to item['string'], null otherwise.
+   *
    * @param call current relational expression
    * @return literal value
    */
@@ -90,7 +90,8 @@ class ElasticsearchRules {
    */
   static boolean isItem(RexNode node) {
     final Boolean result = node.accept(new RexVisitorImpl<Boolean>(false) {
-      @Override public Boolean visitCall(final RexCall call) {
+      @Override
+      public Boolean visitCall(final RexCall call) {
         return isItemCall(uncast(call)) != null;
       }
     });
@@ -112,12 +113,14 @@ class ElasticsearchRules {
   static List<String> elasticsearchFieldNames(final RelDataType rowType) {
     return SqlValidatorUtil.uniquify(
         new AbstractList<String>() {
-          @Override public String get(int index) {
+          @Override
+          public String get(int index) {
             final String name = rowType.getFieldList().get(index).getName();
             return name.startsWith("$") ? "_" + name.substring(2) : name;
           }
 
-          @Override public int size() {
+          @Override
+          public int size() {
             return rowType.getFieldCount();
           }
         },
@@ -147,21 +150,24 @@ class ElasticsearchRules {
       this.inFields = inFields;
     }
 
-    @Override public String visitLiteral(RexLiteral literal) {
+    @Override
+    public String visitLiteral(RexLiteral literal) {
       if (literal.getValue() == null) {
         return "null";
       }
       return "\"literal\":\""
-        + RexToLixTranslator.translateLiteral(literal, literal.getType(),
+          + RexToLixTranslator.translateLiteral(literal, literal.getType(),
           typeFactory, RexImpTable.NullAs.NOT_POSSIBLE)
-        + "\"";
+          + "\"";
     }
 
-    @Override public String visitInputRef(RexInputRef inputRef) {
+    @Override
+    public String visitInputRef(RexInputRef inputRef) {
       return quote(inFields.get(inputRef.getIndex()));
     }
 
-    @Override public String visitCall(RexCall call) {
+    @Override
+    public String visitCall(RexCall call) {
       final String name = isItemCall(call);
       if (name != null) {
         return name;
@@ -176,7 +182,7 @@ class ElasticsearchRules {
       if (call.getOperator() == SqlStdOperatorTable.ITEM) {
         final RexNode op1 = call.getOperands().get(1);
         final SqlTypeName sqlTypeName = op1.getType().getSqlTypeName();
-        if (op1 instanceof RexLiteral && (sqlTypeName == SqlTypeName.INTEGER ||sqlTypeName== SqlTypeName.CHAR )) {
+        if (op1 instanceof RexLiteral && (sqlTypeName == SqlTypeName.INTEGER || sqlTypeName == SqlTypeName.CHAR)) {
           return stripQuotes(strings.get(0)) + "[" + ((RexLiteral) op1).getValue2() + "]";
         }
       }
@@ -186,7 +192,7 @@ class ElasticsearchRules {
 
     List<String> visitList(List<RexNode> list) {
       final List<String> strings = new ArrayList<>();
-      for (RexNode node: list) {
+      for (RexNode node : list) {
         strings.add(node.accept(this));
       }
       return strings;
@@ -201,7 +207,7 @@ class ElasticsearchRules {
     final Convention out;
 
     ElasticsearchConverterRule(Class<? extends RelNode> clazz, RelTrait in, Convention out,
-        String description) {
+                               String description) {
       super(clazz, in, out, description);
       this.out = out;
     }
@@ -220,12 +226,13 @@ class ElasticsearchRules {
           "ElasticsearchSortRule");
     }
 
-    @Override public RelNode convert(RelNode relNode) {
+    @Override
+    public RelNode convert(RelNode relNode) {
       final Sort sort = (Sort) relNode;
       final RelTraitSet traitSet = sort.getTraitSet().replace(out).replace(sort.getCollation());
       return new ElasticsearchSort(relNode.getCluster(), traitSet,
-        convert(sort.getInput(), traitSet.replace(RelCollations.EMPTY)), sort.getCollation(),
-        sort.offset, sort.fetch);
+          convert(sort.getInput(), traitSet.replace(RelCollations.EMPTY)), sort.getCollation(),
+          sort.offset, sort.fetch);
     }
   }
 
@@ -238,15 +245,16 @@ class ElasticsearchRules {
 
     private ElasticsearchFilterRule() {
       super(LogicalFilter.class, Convention.NONE, ElasticsearchRel.CONVENTION,
-        "ElasticsearchFilterRule");
+          "ElasticsearchFilterRule");
     }
 
-    @Override public RelNode convert(RelNode relNode) {
+    @Override
+    public RelNode convert(RelNode relNode) {
       final LogicalFilter filter = (LogicalFilter) relNode;
       final RelTraitSet traitSet = filter.getTraitSet().replace(out);
       return new ElasticsearchFilter(relNode.getCluster(), traitSet,
-        convert(filter.getInput(), out),
-        filter.getCondition());
+          convert(filter.getInput(), out),
+          filter.getCondition());
     }
   }
 
@@ -289,16 +297,35 @@ class ElasticsearchRules {
 
     private ElasticsearchProjectRule() {
       super(LogicalProject.class, Convention.NONE, ElasticsearchRel.CONVENTION,
-        "ElasticsearchProjectRule");
+          "ElasticsearchProjectRule");
     }
 
-    @Override public RelNode convert(RelNode relNode) {
+    @Override
+    public RelNode convert(RelNode relNode) {
       final LogicalProject project = (LogicalProject) relNode;
       final RelTraitSet traitSet = project.getTraitSet().replace(out);
       return new ElasticsearchProject(project.getCluster(), traitSet,
-        convert(project.getInput(), out), project.getProjects(), project.getRowType());
+          convert(project.getInput(), out), project.getProjects(), project.getRowType());
     }
   }
+
+  /**
+   * Rule to convert a {@link org.apache.calcite.rel.core.Sort} to an
+   * {@link ElasticsearchSort}.
+   */
+  private static class ElasticsearchFilterLikeToMatchModificationRule extends RelOptRule {
+    private static final ElasticsearchFilterLikeToMatchModificationRule INSTANCE = new ElasticsearchFilterLikeToMatchModificationRule();
+
+    public ElasticsearchFilterLikeToMatchModificationRule() {
+      super(operand(ElasticsearchFilter.class, any()), "ElasticsearchFilterLikeToMatchModificationRule");
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+
+    }
+  }
+
 }
 
 // End ElasticsearchRules.java
