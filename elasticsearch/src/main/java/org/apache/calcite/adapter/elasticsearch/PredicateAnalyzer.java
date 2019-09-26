@@ -589,7 +589,8 @@ class PredicateAnalyzer {
 
       switch (call.getKind()) {
         case LIKE:
-          throw new UnsupportedOperationException("LIKE not yet supported");
+          return QueryExpression.create(pair.getKey()).like(pair.getValue());
+//          throw new UnsupportedOperationException("LIKE not yet supported");
         case EQUALS:
           return QueryExpression.create(pair.getKey()).equals(pair.getValue());
         case NOT_EQUALS:
