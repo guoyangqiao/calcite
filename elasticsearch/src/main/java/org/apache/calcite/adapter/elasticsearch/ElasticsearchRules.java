@@ -333,7 +333,8 @@ class ElasticsearchRules {
           return super.visitCall(call);
         }
       };
-      rel.accept(shuttle);
+      final RelNode accept = rel.accept(shuttle);
+      call.transformTo(accept);
     }
   }
 
