@@ -450,7 +450,15 @@ class QueryBuilders {
 
     RegexpQueryBuilder(final String fieldName, final String value) {
       assert pureValue(value);
+      assert fullTextLike(value);
       this.matchQueryBuilder = QueryBuilders.match(fieldName, value, ElasticsearchConstants.AND);
+    }
+
+    /**
+     * Value should wrapped with "%"
+     */
+    private boolean fullTextLike(String value) {
+      return value.startsWith("%") && value.endsWith("%");
     }
 
     /**
