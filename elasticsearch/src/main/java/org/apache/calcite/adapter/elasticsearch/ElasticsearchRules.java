@@ -29,12 +29,9 @@ import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexVisitorImpl;
+import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
@@ -326,7 +323,16 @@ class ElasticsearchRules {
     public void onMatch(RelOptRuleCall call) {
       final ElasticsearchFilter rel = call.rel(0);
       final RexNode condition = rel.getCondition();
-
+      new RexShuttle() {
+        @Override
+        public RexNode visitCall(RexCall call) {
+          final SqlOperator operator = call.getOperator();
+          if (SqlStdOperatorTable.AND.equals(operator) || SqlStdOperatorTable.OR.equals(operator)) {
+            final List<RexNode> conditionGroup = call.getOperands();
+          }
+          return super.visitCall(call);
+        }
+      }
     }
   }
 
