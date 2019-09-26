@@ -445,6 +445,10 @@ class QueryBuilders {
    * A Query that does fuzzy matching for a specific value.
    * We assume that the value would not trigger the analyzer work which means there is character such as whitespace in the value.
    * So "%foo%" can be used, but "%foo" "bar%" "%foo bar%" will not be allowed now despite ES owns some support on these queries.
+   * <p>
+   * Case 1: "foo ba%", match_phrase_prefix
+   * Case 2: "%foo bar", not found
+   * Case 3: "%foo bar%", match_phrase
    */
   static class RegexpQueryBuilder extends QueryBuilder {
     private MatchQueryBuilder matchQueryBuilder;
