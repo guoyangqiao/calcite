@@ -53,7 +53,8 @@ class ElasticsearchRules {
       ElasticsearchSortRule.INSTANCE,
       ElasticsearchFilterRule.INSTANCE,
       ElasticsearchProjectRule.INSTANCE,
-      ElasticsearchAggregateRule.INSTANCE
+      ElasticsearchAggregateRule.INSTANCE,
+      ElasticsearchFilterLikeToMatchModificationRule.INSTANCE
   };
 
   private ElasticsearchRules() {
