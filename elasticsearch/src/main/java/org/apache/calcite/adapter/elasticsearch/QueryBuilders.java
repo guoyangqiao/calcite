@@ -453,6 +453,9 @@ class QueryBuilders {
       this.matchQueryBuilder = QueryBuilders.match(fieldName, value, ElasticsearchConstants.AND);
     }
 
+    /**
+     * Value should not make analyzer work
+     */
     private boolean pureValue(String value) {
       return !value.contains(" ") && !value.contains("|");
     }
