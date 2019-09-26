@@ -443,19 +443,23 @@ class QueryBuilders {
 
   /**
    * A Query that does fuzzy matching for a specific value.
+   * We assume that the value would not trigger the analyzer work
    */
   static class RegexpQueryBuilder extends QueryBuilder {
     private final String fieldName;
     private final String value;
+    private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
       this.fieldName = fieldName;
       this.value = value;
+      QueryBuilders.match(fieldName, value, ElasticsearchConstants.AND);
+      MatchQueryBuilder
     }
 
     @Override
     void writeJson(final JsonGenerator generator) throws IOException {
-      throw new UnsupportedOperationException();
+
     }
   }
 
