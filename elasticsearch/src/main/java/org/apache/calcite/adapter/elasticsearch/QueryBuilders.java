@@ -449,7 +449,12 @@ class QueryBuilders {
     private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
+      assert pureValue(value);
       this.matchQueryBuilder = QueryBuilders.match(fieldName, value, ElasticsearchConstants.AND);
+    }
+
+    private boolean pureValue(String value) {
+      return !value.contains(" ") && !value.contains("|");
     }
 
     @Override
