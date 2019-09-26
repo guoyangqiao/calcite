@@ -17,8 +17,6 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import com.fasterxml.jackson.core.JsonGenerator;
-import org.apache.calcite.sql.SqlBinaryOperator;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -189,8 +187,9 @@ class QueryBuilders {
    * A query that matches on condition.
    * Currently we only support <b>OR</b>
    *
-   * @param name The name of the field
-   * @param text The content to be analyzed
+   * @param name     The name of the field
+   * @param text     The content to be analyzed
+   * @param operator Operator, 'and' or 'or'
    */
   static MatchQueryBuilder match(String name, Object text, String operator) {
     return new MatchQueryBuilder(name, text, operator, 1);
