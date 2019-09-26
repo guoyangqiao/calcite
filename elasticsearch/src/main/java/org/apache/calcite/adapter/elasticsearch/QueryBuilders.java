@@ -443,8 +443,8 @@ class QueryBuilders {
 
   /**
    * A Query that does fuzzy matching for a specific value.
-   * We assume that the value would not trigger the analyzer work which means there is character such as whitespace in the value,
-   * so "%foo%" can be used, but "%foo", "bar%", "%foo bar%" will not be allowed now.
+   * We assume that the value would not trigger the analyzer work which means there is character such as whitespace in the value.
+   * So "%foo%" can be used, but "%foo", "bar%", "%foo bar%" will not be allowed now despite ES owns some support on these queries.
    */
   static class RegexpQueryBuilder extends QueryBuilder {
     private MatchQueryBuilder matchQueryBuilder;
