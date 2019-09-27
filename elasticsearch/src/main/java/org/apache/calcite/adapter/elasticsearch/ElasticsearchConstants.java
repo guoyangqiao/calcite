@@ -79,9 +79,9 @@ interface ElasticsearchConstants {
     }
   }
 
-  SqlOperator MATCH_AND = new EsMatchOperator(ES_MATCH_AND, SqlKind.OTHER_FUNCTION, AND);
+  SqlOperator MATCH_AND_SQL_OPERATOR = new EsMatchOperator(ES_MATCH_AND, SqlKind.OTHER_FUNCTION, AND);
 
-  SqlOperator MATCH_OR = new EsMatchOperator(ES_MATCH_OR, SqlKind.OTHER_FUNCTION, OR);
+  SqlOperator MATCH_OR_SQL_OPERATOR = new EsMatchOperator(ES_MATCH_OR, SqlKind.OTHER_FUNCTION, OR);
 
   /**
    * Trim SQL like percent sign around

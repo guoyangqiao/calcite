@@ -342,7 +342,7 @@ class ElasticsearchRules {
                 return call.builder().
                     getRexBuilder().
                     makeCall(
-                        SqlStdOperatorTable.AND.equals(operator) ? ElasticsearchConstants.MATCH_AND : ElasticsearchConstants.MATCH_OR,
+                        SqlStdOperatorTable.AND.equals(operator) ? ElasticsearchConstants.MATCH_AND_SQL_OPERATOR : ElasticsearchConstants.MATCH_OR_SQL_OPERATOR,
                         ((RexCall) conditionGroup.get(0)).getOperands().get(0),
                         rexBuilder.makeLiteral(matchStr)
                     );
