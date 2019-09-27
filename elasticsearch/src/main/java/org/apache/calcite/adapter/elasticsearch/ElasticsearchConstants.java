@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.sql.SqlInternalOperator;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.SqlSyntax;
 
 import java.util.Set;
 
@@ -56,7 +57,12 @@ interface ElasticsearchConstants {
     return "_MAP".equals(name);
   }
 
-  SqlOperator MATCH = new SqlInternalOperator("ES_MATCH", SqlKind.IN);
+  SqlOperator MATCH = new SqlInternalOperator("ES_MATCH", SqlKind.IN) {
+    @Override
+    public SqlSyntax getSyntax() {
+      return SqlSyntax.BINARY;
+    }
+  };
 }
 
 // End ElasticsearchConstants.java

@@ -491,9 +491,6 @@ class PredicateAnalyzer {
                 operands.get(operands.size() - 1));
             return QueryExpression.create(new NamedFieldExpression()).queryString(query);
           }
-          if (call.getOperator().getName().equalsIgnoreCase("ES_MATCH")) {
-
-          }
           // fall through
         default:
           String message = format(Locale.ROOT, "Unsupported syntax [%s] for call: [%s]",
