@@ -191,6 +191,12 @@ public class QueryBuildersTest {
         toJson(nestedQuery));
   }
 
+  @Test
+  public void match() throws IOException {
+    assertEquals("{\"match_all\":{}}",
+        toJson(QueryBuilders.matchQuery()));
+  }
+
   private String toJson(QueryBuilders.QueryBuilder builder) throws IOException {
     StringWriter writer = new StringWriter();
     JsonGenerator gen = mapper.getFactory().createGenerator(writer);

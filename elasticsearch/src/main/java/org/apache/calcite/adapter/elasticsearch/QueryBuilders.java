@@ -187,7 +187,7 @@ class QueryBuilders {
     return new MatchQueryBuilder(name, text, operator, 1);
   }
 
-  private static MatchPhraseQueryBuilder matchPhraseQuery(String name, Object text) {
+  static MatchPhraseQueryBuilder matchPhraseQuery(String name, Object text) {
     return new MatchPhraseQueryBuilder(name, text);
   }
 
