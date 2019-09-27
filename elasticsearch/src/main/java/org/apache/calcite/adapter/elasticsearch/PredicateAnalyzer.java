@@ -958,7 +958,7 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression match(LiteralExpression literal) {
+    public QueryExpression match(LiteralExpression literal, String operator) {
       throw new PredicateAnalyzerException("SqlOperatorImpl ['match'] "
           + "cannot be applied to a compound expression");
     }
