@@ -325,22 +325,22 @@ class ElasticsearchRules {
       final ElasticsearchFilter rel = call.rel(0);
       final RexShuttle shuttle = new RexShuttle() {
         @Override
-        public RexNode visitCall(RexCall call) {
-          final SqlOperator operator = call.getOperator();
+        public RexNode visitCall(RexCall rexCall) {
+          final SqlOperator operator = rexCall.getOperator();
           if (SqlStdOperatorTable.AND.equals(operator) || SqlStdOperatorTable.OR.equals(operator)) {
-            final List<RexNode> conditionGroup = call.getOperands();
-            if (allLike(conditionGroup) && equivalentInputIndex(conditionGroup)) {
-
+            final List<RexNode> conditionGroup = rexCall.getOperands();
+            if (allLike(conditionGroup) && equivalentInput(conditionGroup)) {
+              final RexNode matchRexNode = call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, conditionGroup.stream().map(x -> ((RexCall) x).getOperands().get(1)).collect(Collectors.toList()));
             }
           }
-          return super.visitCall(call);
+          return super.visitCall(rexCall);
         }
       };
       final RelNode accept = rel.accept(shuttle);
       call.transformTo(accept);
     }
 
-    private boolean equivalentInputIndex(List<RexNode> conditionGroup) {
+    private boolean equivalentInput(List<RexNode> conditionGroup) {
       return conditionGroup.stream().map(x -> {
         if (x instanceof RexCall) {
           final RexNode rexNode = ((RexCall) x).getOperands().get(0);
