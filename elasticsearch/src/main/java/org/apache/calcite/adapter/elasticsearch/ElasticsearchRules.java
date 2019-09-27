@@ -353,7 +353,7 @@ class ElasticsearchRules {
     }
 
     private boolean allLike(List<RexNode> conditionGroup) {
-      return conditionGroup.stream().allMatch(x -> (x instanceof RexCall && ((RexCall) x).getOperator().equals(SqlStdOperatorTable.LIKE)))
+      return conditionGroup.stream().allMatch(x -> (x instanceof RexCall && ((RexCall) x).getOperator().equals(SqlStdOperatorTable.LIKE)));
     }
   }
 
