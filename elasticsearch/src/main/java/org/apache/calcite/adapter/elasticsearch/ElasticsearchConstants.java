@@ -29,7 +29,7 @@ import java.util.Set;
  * Internal constants referenced in this package.
  */
 interface ElasticsearchConstants {
-
+  String WHITE_SPACE = " ";
   String AND = "and";
   String OR = "or";
   String INDEX = "_index";

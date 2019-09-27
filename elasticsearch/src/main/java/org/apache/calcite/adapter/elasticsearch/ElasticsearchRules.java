@@ -337,8 +337,8 @@ class ElasticsearchRules {
                     return ElasticsearchConstants.trimPercentSign((RexLiteral) rexNode);
                   }
                   throw new IllegalArgumentException("Not compatible with non literal");
-                }).collect(Collectors.joining(" "));
-                return call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, collect);
+                }).collect(Collectors.joining(ElasticsearchConstants.WHITE_SPACE));
+                return call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, matchStr);
 
               } catch (IllegalArgumentException t) {
                 //ok, not like contains some unusual value, return to normal case
