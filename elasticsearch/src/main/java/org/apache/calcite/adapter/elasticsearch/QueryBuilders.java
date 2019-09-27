@@ -183,12 +183,12 @@ class QueryBuilders {
     return new MatchAllQueryBuilder();
   }
 
-  static FulltextQueryBuilder matchQuery(String name, Object text, String operator) {
-    return new FulltextQueryBuilder(name, text, "match", operator, 1);
+  static MatchQueryBuilder matchQuery(String name, Object text, String operator) {
+    return new MatchQueryBuilder(name, text, operator, 1);
   }
 
-  private static FulltextQueryBuilder matchPhraseQuery(String name, Object text) {
-    return new FulltextQueryBuilder(name, text, "match_phrase", ElasticsearchConstants.AND, 1);
+  private static MatchPhraseQueryBuilder matchPhraseQuery(String name, Object text) {
+    return new MatchPhraseQueryBuilder(name, text);
   }
 
   /**
@@ -448,15 +448,15 @@ class QueryBuilders {
    * Case 3: "%foo bar%", match_phrase
    */
   static class RegexpQueryBuilder extends QueryBuilder {
-    private FulltextQueryBuilder fulltextQueryBuilder;
+    private MatchPhraseQueryBuilder matchPhraseQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
-      this.fulltextQueryBuilder = matchPhraseQuery(fieldName, value, ElasticsearchConstants.AND);
+      this.matchPhraseQueryBuilder = matchPhraseQuery(fieldName, value);
     }
 
     @Override
     void writeJson(final JsonGenerator generator) throws IOException {
-      this.fulltextQueryBuilder.writeJson(generator);
+      this.matchPhraseQueryBuilder.writeJson(generator);
     }
   }
 
@@ -531,18 +531,16 @@ class QueryBuilders {
   /**
    * A query that matches on condition
    */
-  static class FulltextQueryBuilder extends QueryBuilder {
+  static class MatchQueryBuilder extends QueryBuilder {
 
     private final String operator;
     private final long minimumShouldMatch;
     private final String name;
     private final Object text;
-    private final String fulltextMatchType;
 
-    private FulltextQueryBuilder(String name, Object text, String fulltextMatchType, String operator, long minimumShouldMatch) {
+    private MatchQueryBuilder(String name, Object text, String operator, long minimumShouldMatch) {
       this.name = name;
       this.text = text;
-      this.fulltextMatchType = fulltextMatchType;
       if ((!ElasticsearchConstants.AND.equals(operator) && !ElasticsearchConstants.OR.equals(operator))) {
         throw new RuntimeException("Match query can use only AND OR");
       }
@@ -553,16 +551,14 @@ class QueryBuilders {
     @Override
     void writeJson(JsonGenerator generator) throws IOException {
       generator.writeStartObject();
-      generator.writeFieldName(fulltextMatchType);
+      generator.writeFieldName("match");
       generator.writeStartObject();
       generator.writeFieldName(name);
       generator.writeStartObject();
       generator.writeFieldName("query");
       generator.writeObject(text);
-      if (operator != null) {
-        generator.writeFieldName("operator");
-        generator.writeString(operator);
-      }
+      generator.writeFieldName("operator");
+      generator.writeString(operator);
       generator.writeFieldName("minimum_should_match");
       generator.writeNumber(minimumShouldMatch);
       generator.writeEndObject();
@@ -570,6 +566,29 @@ class QueryBuilders {
       generator.writeEndObject();
     }
   }
+
+  static class MatchPhraseQueryBuilder extends QueryBuilder {
+
+    private final String name;
+    private final Object text;
+
+    private MatchPhraseQueryBuilder(String name, Object text) {
+      this.name = name;
+      this.text = text;
+    }
+
+    @Override
+    void writeJson(JsonGenerator generator) throws IOException {
+      generator.writeStartObject();
+      generator.writeFieldName("match_phrase");
+      generator.writeStartObject();
+      generator.writeFieldName(name);
+      generator.writeObject(text);
+      generator.writeEndObject();
+      generator.writeEndObject();
+    }
+  }
+
 
   static class HasChildQueryBuilder extends QueryBuilder {
     private String childType;
