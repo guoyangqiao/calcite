@@ -816,8 +816,6 @@ class PredicateAnalyzer {
 
     public abstract QueryExpression match(LiteralExpression literal);
 
-    public abstract QueryExpression matchPhrase(LiteralExpression literal);
-
     public abstract QueryExpression queryString(String query);
 
     public abstract QueryExpression isTrue();
@@ -1108,12 +1106,7 @@ class PredicateAnalyzer {
     @Override
     public QueryExpression match(LiteralExpression literal) {
       Object value = literal.value();
-      builder = addFormatIfNecessary(literal, QueryBuilders.match(getFieldReference()).lte(value));
-      return null;
-    }
-
-    @Override
-    public QueryExpression matchPhrase(LiteralExpression literal) {
+      builder = addFormatIfNecessary(literal, QueryBuilders.matchQuery(getFieldReference()).lte(value));
       return null;
     }
 
