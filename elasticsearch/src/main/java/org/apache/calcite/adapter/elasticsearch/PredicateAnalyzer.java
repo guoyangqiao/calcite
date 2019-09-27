@@ -1100,9 +1100,8 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression match(LiteralExpression literal) {
-      Object value = literal.value();
-      builder = addFormatIfNecessary(literal, QueryBuilders.matchQuery(getFieldReference(), value);
+    public QueryExpression match(LiteralExpression literal, String operator) {
+      builder = QueryBuilders.matchQuery(getFieldReference(), literal.stringValue(), operator);
       return null;
     }
 
