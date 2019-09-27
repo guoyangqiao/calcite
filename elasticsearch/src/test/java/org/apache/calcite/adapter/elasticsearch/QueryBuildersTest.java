@@ -193,8 +193,10 @@ public class QueryBuildersTest {
 
   @Test
   public void match() throws IOException {
-    assertEquals("{\"match_all\":{}}",
-        toJson(QueryBuilders.matchQuery()));
+    assertEquals("{\"match\":{\"foo\":{\"query\":\"bar quex\",\"operator\":\"and\",\"minimum_should_match\":1}}}",
+        toJson(QueryBuilders.matchQuery("foo", "bar quex", ElasticsearchConstants.AND)));
+    assertEquals("{\"match\":{\"foo\":{\"query\":\"bar quex\",\"operator\":\"or\",\"minimum_should_match\":1}}}",
+        toJson(QueryBuilders.matchQuery("foo", "bar quex", ElasticsearchConstants.OR)));
   }
 
   private String toJson(QueryBuilders.QueryBuilder builder) throws IOException {
