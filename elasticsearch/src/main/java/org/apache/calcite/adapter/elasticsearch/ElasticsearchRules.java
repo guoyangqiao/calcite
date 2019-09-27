@@ -52,7 +52,7 @@ class ElasticsearchRules {
       ElasticsearchFilterRule.INSTANCE,
       ElasticsearchProjectRule.INSTANCE,
       ElasticsearchAggregateRule.INSTANCE,
-      ElasticsearchFilterLikeToMatchModificationRule.INSTANCE
+      ElasticsearchFilterLikeToMatchRule.INSTANCE
   };
 
   private ElasticsearchRules() {
