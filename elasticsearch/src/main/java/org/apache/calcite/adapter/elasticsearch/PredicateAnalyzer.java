@@ -617,7 +617,7 @@ class PredicateAnalyzer {
           return QueryExpression.create(pair.getKey()).lte(pair.getValue());
         case OTHER_FUNCTION:
           if (call.getOperator().getName().equalsIgnoreCase(ElasticsearchConstants.ES_MATCH)) {
-            return QueryExpression.create(pair.getKey()).like()
+            return QueryExpression.create(pair.getKey()).match(pair.getValue());
           }
 
         default:
@@ -1100,7 +1100,7 @@ class PredicateAnalyzer {
     @Override
     public QueryExpression match(LiteralExpression literal) {
       Object value = literal.value();
-      builder = addFormatIfNecessary(literal, QueryBuilders.matchQuery(getFieldReference()).lte(value));
+      builder = addFormatIfNecessary(literal, QueryBuilders.matchQuery(getFieldReference(), value);
       return null;
     }
 

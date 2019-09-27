@@ -451,7 +451,7 @@ class QueryBuilders {
     private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
-      this.matchQueryBuilder = matchPhraseQuery(fieldName, value, value);
+      this.matchQueryBuilder = matchPhraseQuery(fieldName, value, ElasticsearchConstants.AND);
     }
 
     @Override
