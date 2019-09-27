@@ -69,7 +69,7 @@ interface ElasticsearchConstants {
       this.operator = operator;
     }
 
-    public String getOperator() {
+    String getOperator() {
       return operator;
     }
 
