@@ -316,7 +316,7 @@ class ElasticsearchRules {
   private static class ElasticsearchFilterLikeToMatchModificationRule extends RelOptRule {
     private static final ElasticsearchFilterLikeToMatchModificationRule INSTANCE = new ElasticsearchFilterLikeToMatchModificationRule();
 
-    public ElasticsearchFilterLikeToMatchModificationRule() {
+    ElasticsearchFilterLikeToMatchModificationRule() {
       super(operand(ElasticsearchFilter.class, any()), "ElasticsearchFilterLikeToMatchModificationRule");
     }
 
@@ -330,7 +330,19 @@ class ElasticsearchRules {
           if (SqlStdOperatorTable.AND.equals(operator) || SqlStdOperatorTable.OR.equals(operator)) {
             final List<RexNode> conditionGroup = rexCall.getOperands();
             if (allLike(conditionGroup) && equivalentInput(conditionGroup)) {
-              return call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, conditionGroup.stream().map(x -> ((RexCall) x).getOperands().get(1)).collect(Collectors.toList()));
+              try {
+                final String matchStr = conditionGroup.stream().map(x -> {
+                  final RexNode rexNode = ((RexCall) x).getOperands().get(1);
+                  if (rexNode instanceof RexLiteral) {
+                    return ElasticsearchConstants.trimPercentSign((RexLiteral) rexNode);
+                  }
+                  throw new IllegalArgumentException("Not compatible with non literal");
+                }).collect(Collectors.joining(" "));
+                return call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, collect);
+
+              } catch (IllegalArgumentException t) {
+                //ok, not like contains some unusual value, return to normal case
+              }
             }
           }
           return super.visitCall(rexCall);
