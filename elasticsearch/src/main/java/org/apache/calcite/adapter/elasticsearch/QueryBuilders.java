@@ -451,20 +451,7 @@ class QueryBuilders {
     private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
-      this.matchQueryBuilder = matchPhraseQuery(fieldName, value, defineOperator(value));
-    }
-
-    /**
-     * If value split with whitespace and are words, we identified words' relation as OR, otherwise AND
-     */
-    private String defineOperator(String value) {
-      String operator;
-      if (value.startsWith("%") || value.endsWith("%")) {
-        operator = ElasticsearchConstants.AND;
-      } else {
-        operator = ElasticsearchConstants.OR;
-      }
-      return operator;
+      this.matchQueryBuilder = matchPhraseQuery(fieldName, value, value);
     }
 
     @Override
