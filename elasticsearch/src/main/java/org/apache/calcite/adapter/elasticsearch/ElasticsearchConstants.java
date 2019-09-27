@@ -18,7 +18,6 @@ package org.apache.calcite.adapter.elasticsearch;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.sql.SqlInternalOperator;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSyntax;
@@ -65,7 +64,7 @@ interface ElasticsearchConstants {
 
     private final String operator;
 
-    public EsMatchOperator(String name, SqlKind kind, String operator) {
+    EsMatchOperator(String name, SqlKind kind, String operator) {
       super(name, kind);
       this.operator = operator;
     }
