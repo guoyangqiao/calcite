@@ -56,7 +56,7 @@ interface ElasticsearchConstants {
     return "_MAP".equals(name);
   }
 
-  SqlOperator MATCH = new SqlInternalOperator("MATCH", SqlKind.IN);
+  SqlOperator MATCH = new SqlInternalOperator("ES_MATCH", SqlKind.IN);
 }
 
 // End ElasticsearchConstants.java
