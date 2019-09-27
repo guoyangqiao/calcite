@@ -22,6 +22,7 @@ import org.apache.calcite.sql.SqlInternalOperator;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSyntax;
+import org.apache.calcite.sql.fun.SqlInOperator;
 
 import java.util.Set;
 
@@ -60,26 +61,28 @@ interface ElasticsearchConstants {
     return "_MAP".equals(name);
   }
 
-  SqlOperator MATCH_AND = new SqlInternalOperator(ES_MATCH_AND, SqlKind.OTHER_FUNCTION) {
-    /**
-     * Obviously it is not a binary operation, but the underlying MATCH is a binary operation
-     */
+  class EsMatchOperator extends SqlInOperator {
+
+    private final String operator;
+
+    public EsMatchOperator(String name, SqlKind kind, String operator) {
+      super(name, kind);
+      this.operator = operator;
+    }
+
+    public String getOperator() {
+      return operator;
+    }
+
     @Override
     public SqlSyntax getSyntax() {
       return SqlSyntax.BINARY;
     }
-  };
+  }
 
-  SqlOperator MATCH_OR = new SqlInternalOperator(ES_MATCH_OR, SqlKind.OTHER_FUNCTION) {
+  SqlOperator MATCH_AND = new EsMatchOperator(ES_MATCH_AND, SqlKind.OTHER_FUNCTION, AND);
 
-    /**
-     * Obviously it is not a binary operation, but the underlying MATCH is a binary operation
-     */
-    @Override
-    public SqlSyntax getSyntax() {
-      return SqlSyntax.BINARY;
-    }
-  };
+  SqlOperator MATCH_OR = new EsMatchOperator(ES_MATCH_OR, SqlKind.OTHER_FUNCTION, OR);
 
   /**
    * Trim SQL like percent sign around

@@ -339,7 +339,7 @@ class ElasticsearchRules {
                   }
                   throw new IllegalArgumentException("Not compatible with non literal");
                 }).collect(Collectors.joining(ElasticsearchConstants.WHITE_SPACE));
-                return call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, ((RexCall) conditionGroup.get(0)).getOperands().get(0), rexBuilder.makeLiteral(matchStr));
+                return call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH_AND, ((RexCall) conditionGroup.get(0)).getOperands().get(0), rexBuilder.makeLiteral(matchStr));
               } catch (IllegalArgumentException t) {
                 //ok, not like contains some unusual value, return to normal case
               }
