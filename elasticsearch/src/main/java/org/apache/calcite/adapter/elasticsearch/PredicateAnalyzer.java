@@ -619,7 +619,6 @@ class PredicateAnalyzer {
           if (call.getOperator().getName().equalsIgnoreCase(ElasticsearchConstants.ES_MATCH)) {
             return QueryExpression.create(pair.getKey()).match(pair.getValue());
           }
-
         default:
           break;
       }
