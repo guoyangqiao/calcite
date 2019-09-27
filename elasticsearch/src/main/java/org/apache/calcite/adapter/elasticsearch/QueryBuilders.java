@@ -183,16 +183,12 @@ class QueryBuilders {
     return new MatchAllQueryBuilder();
   }
 
-  /**
-   * A query that matches on condition.
-   * Currently we only support <b>OR</b>
-   *
-   * @param name     The name of the field
-   * @param text     The content to be analyzed
-   * @param operator Operator, must be one of ["and", "or"]
-   */
-  static MatchQueryBuilder match(String name, Object text, String operator) {
-    return new MatchQueryBuilder(name, text, operator, 1);
+  static MatchQueryBuilder matchQuery(String name, Object text, String operator) {
+    return new MatchQueryBuilder(name, text, "match", operator, 1);
+  }
+
+  static MatchQueryBuilder matchPhraseQuery(String name, Object text, String operator) {
+    return new MatchQueryBuilder(name, text, "match_phrase", operator, 1);
   }
 
   /**
@@ -455,7 +451,7 @@ class QueryBuilders {
     private MatchQueryBuilder matchQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
-      this.matchQueryBuilder = match(fieldName, value, defineOperator(value));
+      this.matchQueryBuilder = matchPhraseQuery(fieldName, value, defineOperator(value));
     }
 
     /**
@@ -554,10 +550,12 @@ class QueryBuilders {
     private final long minimumShouldMatch;
     private final String name;
     private final Object text;
+    private final String fulltextMatchType;
 
-    private MatchQueryBuilder(String name, Object text, String operator, long minimumShouldMatch) {
+    private MatchQueryBuilder(String name, Object text, String fulltextMatchType, String operator, long minimumShouldMatch) {
       this.name = name;
       this.text = text;
+      this.fulltextMatchType = fulltextMatchType;
       if ((!ElasticsearchConstants.AND.equals(operator) && !ElasticsearchConstants.OR.equals(operator))) {
         throw new RuntimeException("Match query can use only AND OR");
       }
@@ -568,7 +566,7 @@ class QueryBuilders {
     @Override
     void writeJson(JsonGenerator generator) throws IOException {
       generator.writeStartObject();
-      generator.writeFieldName("match");
+      generator.writeFieldName(fulltextMatchType);
       generator.writeStartObject();
       generator.writeFieldName(name);
       generator.writeStartObject();

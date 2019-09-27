@@ -616,7 +616,10 @@ class PredicateAnalyzer {
           }
           return QueryExpression.create(pair.getKey()).lte(pair.getValue());
         case OTHER_FUNCTION:
-          if()
+          if (call.getOperator().getName().equalsIgnoreCase(ElasticsearchConstants.ES_MATCH)) {
+            return QueryExpression.create(pair.getKey()).like()
+          }
+
         default:
           break;
       }
@@ -811,6 +814,10 @@ class PredicateAnalyzer {
 
     public abstract QueryExpression lte(LiteralExpression literal);
 
+    public abstract QueryExpression match(LiteralExpression literal);
+
+    public abstract QueryExpression matchPhrase(LiteralExpression literal);
+
     public abstract QueryExpression queryString(String query);
 
     public abstract QueryExpression isTrue();
@@ -951,6 +958,18 @@ class PredicateAnalyzer {
     }
 
     @Override
+    public QueryExpression match(LiteralExpression literal) {
+      throw new PredicateAnalyzerException("SqlOperatorImpl ['match'] "
+          + "cannot be applied to a compound expression");
+    }
+
+    @Override
+    public QueryExpression matchPhrase(LiteralExpression literal) {
+      throw new PredicateAnalyzerException("SqlOperatorImpl ['match_phrase'] "
+          + "cannot be applied to a compound expression");
+    }
+
+    @Override
     public QueryExpression queryString(String query) {
       throw new PredicateAnalyzerException("QueryString "
           + "cannot be applied to a compound expression");
@@ -1084,6 +1103,18 @@ class PredicateAnalyzer {
       Object value = literal.value();
       builder = addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).lte(value));
       return this;
+    }
+
+    @Override
+    public QueryExpression match(LiteralExpression literal) {
+      Object value = literal.value();
+      builder = addFormatIfNecessary(literal, QueryBuilders.match(getFieldReference()).lte(value));
+      return null;
+    }
+
+    @Override
+    public QueryExpression matchPhrase(LiteralExpression literal) {
+      return null;
     }
 
     @Override

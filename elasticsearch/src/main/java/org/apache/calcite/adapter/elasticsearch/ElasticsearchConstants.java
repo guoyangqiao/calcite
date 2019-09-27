@@ -29,6 +29,7 @@ import java.util.Set;
  * Internal constants referenced in this package.
  */
 interface ElasticsearchConstants {
+  String ES_MATCH = "ES_MATCH";
   String WHITE_SPACE = " ";
   String AND = "and";
   String OR = "or";
@@ -58,14 +59,14 @@ interface ElasticsearchConstants {
     return "_MAP".equals(name);
   }
 
-  SqlOperator MATCH = new SqlInternalOperator("ES_MATCH", SqlKind.OTHER_FUNCTION) {
+  SqlOperator MATCH = new SqlInternalOperator(ES_MATCH, SqlKind.OTHER_FUNCTION) {
 
     /**
      * Obviously it is not a binary operation, but the underlying MATCH is a binary operation
      */
     @Override
     public SqlSyntax getSyntax() {
-      return SqlSyntax.SPECIAL;
+      return SqlSyntax.BINARY;
     }
   };
 
