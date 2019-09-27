@@ -330,7 +330,7 @@ class ElasticsearchRules {
           if (SqlStdOperatorTable.AND.equals(operator) || SqlStdOperatorTable.OR.equals(operator)) {
             final List<RexNode> conditionGroup = rexCall.getOperands();
             if (allLike(conditionGroup) && equivalentInput(conditionGroup)) {
-              final RexNode matchRexNode = call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, conditionGroup.stream().map(x -> ((RexCall) x).getOperands().get(1)).collect(Collectors.toList()));
+              return call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, conditionGroup.stream().map(x -> ((RexCall) x).getOperands().get(1)).collect(Collectors.toList()));
             }
           }
           return super.visitCall(rexCall);
