@@ -323,6 +323,7 @@ class ElasticsearchRules {
     @Override
     public void onMatch(RelOptRuleCall call) {
       final ElasticsearchFilter rel = call.rel(0);
+      final RexBuilder rexBuilder = call.builder().getRexBuilder();
       final RexShuttle shuttle = new RexShuttle() {
         @Override
         public RexNode visitCall(RexCall rexCall) {
@@ -338,8 +339,7 @@ class ElasticsearchRules {
                   }
                   throw new IllegalArgumentException("Not compatible with non literal");
                 }).collect(Collectors.joining(ElasticsearchConstants.WHITE_SPACE));
-                return call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, matchStr);
-
+                return call.builder().getRexBuilder().makeCall(ElasticsearchConstants.MATCH, rexBuilder.makeLiteral(matchStr));
               } catch (IllegalArgumentException t) {
                 //ok, not like contains some unusual value, return to normal case
               }
