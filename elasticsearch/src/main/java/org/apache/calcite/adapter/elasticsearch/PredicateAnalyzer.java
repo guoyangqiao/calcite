@@ -1027,7 +1027,7 @@ class PredicateAnalyzer {
 
     @Override
     public QueryExpression like(LiteralExpression literal) {
-      builder = QueryBuilders.regexpQuery(getFieldReference(), literal.stringValue());
+      builder = QueryBuilders.regexpQuery(getFieldReference(), ElasticsearchConstants.trimPercentSign(literal.stringValue()));
       return this;
     }
 

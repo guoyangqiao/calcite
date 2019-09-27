@@ -17,7 +17,6 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import com.google.common.collect.ImmutableSet;
-import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSyntax;
@@ -86,15 +85,14 @@ interface ElasticsearchConstants {
   /**
    * Trim SQL like percent sign around
    */
-  static String trimPercentSign(RexLiteral rexNode) {
-    String s = String.valueOf(rexNode.getValue());
-    if (s.startsWith("%")) {
-      s = s.substring(1);
+  static String trimPercentSign(String value) {
+    if (value.startsWith("%")) {
+      value = value.substring(1);
     }
-    if (s.endsWith("%")) {
-      s = s.substring(0, s.length() - 1);
+    if (value.endsWith("%")) {
+      value = value.substring(0, value.length() - 1);
     }
-    return s;
+    return value;
   }
 }
 
