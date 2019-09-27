@@ -39,6 +39,7 @@ import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Rules and relational operators for
@@ -328,13 +329,31 @@ class ElasticsearchRules {
           final SqlOperator operator = call.getOperator();
           if (SqlStdOperatorTable.AND.equals(operator) || SqlStdOperatorTable.OR.equals(operator)) {
             final List<RexNode> conditionGroup = call.getOperands();
+            if (allLike(conditionGroup) && equivalentInputIndex(conditionGroup)) {
 
+            }
           }
           return super.visitCall(call);
         }
       };
       final RelNode accept = rel.accept(shuttle);
       call.transformTo(accept);
+    }
+
+    private boolean equivalentInputIndex(List<RexNode> conditionGroup) {
+      return conditionGroup.stream().map(x -> {
+        if (x instanceof RexCall) {
+          final RexNode rexNode = ((RexCall) x).getOperands().get(0);
+          if (rexNode instanceof RexInputRef) {
+            return ((RexInputRef) rexNode).getIndex();
+          }
+        }
+        return -1;
+      }).collect(Collectors.toSet()).size() > 1;
+    }
+
+    private boolean allLike(List<RexNode> conditionGroup) {
+      return conditionGroup.stream().allMatch(x -> (x instanceof RexCall && ((RexCall) x).getOperator().equals(SqlStdOperatorTable.LIKE)))
     }
   }
 

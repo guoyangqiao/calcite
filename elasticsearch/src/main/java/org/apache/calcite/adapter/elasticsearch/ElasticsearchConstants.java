@@ -17,6 +17,9 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.calcite.sql.SqlInternalOperator;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 
 import java.util.Set;
 
@@ -24,6 +27,7 @@ import java.util.Set;
  * Internal constants referenced in this package.
  */
 interface ElasticsearchConstants {
+
   String AND = "and";
   String OR = "or";
   String INDEX = "_index";
@@ -52,6 +56,7 @@ interface ElasticsearchConstants {
     return "_MAP".equals(name);
   }
 
+  SqlOperator MATCH = new SqlInternalOperator("MATCH", SqlKind.IN);
 }
 
 // End ElasticsearchConstants.java
