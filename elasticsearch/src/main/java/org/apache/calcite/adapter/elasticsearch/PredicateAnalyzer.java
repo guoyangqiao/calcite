@@ -35,6 +35,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
@@ -616,11 +617,9 @@ class PredicateAnalyzer {
           }
           return QueryExpression.create(pair.getKey()).lte(pair.getValue());
         case OTHER_FUNCTION:
-          if (call.getOperator().getName().equalsIgnoreCase(ElasticsearchConstants.ES_MATCH_AND)) {
-            return QueryExpression.create(pair.getKey()).match(pair.getValue(), ElasticsearchConstants.ES_MATCH_AND);
-          }
-          if (call.getOperator().getName().equalsIgnoreCase(ElasticsearchConstants.ES_MATCH_OR)) {
-            return QueryExpression.create(pair.getKey()).match(pair.getValue(), ElasticsearchConstants.ES_MATCH_OR);
+          final SqlOperator operator = call.getOperator();
+          if (operator instanceof ElasticsearchConstants.EsMatchOperator) {
+            return QueryExpression.create(pair.getKey()).match(pair.getValue(), ((ElasticsearchConstants.EsMatchOperator) operator).getOperator());
           }
         default:
           break;
