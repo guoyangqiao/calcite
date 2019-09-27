@@ -311,7 +311,7 @@ class ElasticsearchRules {
   /**
    * Rule to modify {@link ElasticsearchFilter} condition.
    * Implemented:
-   * a field with LIKEs to single MATCH
+   * a field with LIKEs to single elasticsearch MATCH semantic
    */
   private static class ElasticsearchFilterLikeToMatchModificationRule extends RelOptRule {
     private static final ElasticsearchFilterLikeToMatchModificationRule INSTANCE = new ElasticsearchFilterLikeToMatchModificationRule();
