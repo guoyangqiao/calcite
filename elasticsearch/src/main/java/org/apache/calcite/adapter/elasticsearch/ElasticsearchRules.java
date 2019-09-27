@@ -313,11 +313,11 @@ class ElasticsearchRules {
    * Implemented:
    * a field with LIKEs to single elasticsearch MATCH semantic
    */
-  private static class ElasticsearchFilterLikeToMatchModificationRule extends RelOptRule {
-    private static final ElasticsearchFilterLikeToMatchModificationRule INSTANCE = new ElasticsearchFilterLikeToMatchModificationRule();
+  private static class ElasticsearchFilterLikeToMatchRule extends RelOptRule {
+    private static final ElasticsearchFilterLikeToMatchRule INSTANCE = new ElasticsearchFilterLikeToMatchRule();
 
-    ElasticsearchFilterLikeToMatchModificationRule() {
-      super(operand(ElasticsearchFilter.class, any()), "ElasticsearchFilterLikeToMatchModificationRule");
+    ElasticsearchFilterLikeToMatchRule() {
+      super(operand(ElasticsearchFilter.class, any()), "ElasticsearchFilterLikeToMatchRule");
     }
 
     @Override
