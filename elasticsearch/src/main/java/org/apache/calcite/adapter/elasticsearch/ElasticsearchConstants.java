@@ -58,6 +58,7 @@ interface ElasticsearchConstants {
   }
 
   SqlOperator MATCH = new SqlInternalOperator("ES_MATCH", SqlKind.OTHER_FUNCTION) {
+
     /**
      * Obviously it is not a binary operation, but the underlying MATCH is a binary operation
      */
