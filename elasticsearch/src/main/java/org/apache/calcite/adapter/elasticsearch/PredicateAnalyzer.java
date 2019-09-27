@@ -616,8 +616,11 @@ class PredicateAnalyzer {
           }
           return QueryExpression.create(pair.getKey()).lte(pair.getValue());
         case OTHER_FUNCTION:
-          if (call.getOperator().getName().equalsIgnoreCase(ElasticsearchConstants.ES_MATCH)) {
-            return QueryExpression.create(pair.getKey()).match(pair.getValue());
+          if (call.getOperator().getName().equalsIgnoreCase(ElasticsearchConstants.ES_MATCH_AND)) {
+            return QueryExpression.create(pair.getKey()).match(pair.getValue(), ElasticsearchConstants.ES_MATCH_AND);
+          }
+          if (call.getOperator().getName().equalsIgnoreCase(ElasticsearchConstants.ES_MATCH_OR)) {
+            return QueryExpression.create(pair.getKey()).match(pair.getValue(), ElasticsearchConstants.ES_MATCH_OR);
           }
         default:
           break;
@@ -813,7 +816,7 @@ class PredicateAnalyzer {
 
     public abstract QueryExpression lte(LiteralExpression literal);
 
-    public abstract QueryExpression match(LiteralExpression literal);
+    public abstract QueryExpression match(LiteralExpression literal, String operator);
 
     public abstract QueryExpression queryString(String query);
 
