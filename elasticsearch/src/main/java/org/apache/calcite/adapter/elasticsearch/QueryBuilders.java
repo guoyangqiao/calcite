@@ -183,12 +183,12 @@ class QueryBuilders {
     return new MatchAllQueryBuilder();
   }
 
-  static MatchQueryBuilder matchQuery(String name, Object text, String operator) {
-    return new MatchQueryBuilder(name, text, "match", operator, 1);
+  static FulltextQueryBuilder matchQuery(String name, Object text, String operator) {
+    return new FulltextQueryBuilder(name, text, "match", operator, 1);
   }
 
-  static MatchQueryBuilder matchPhraseQuery(String name, Object text, String operator) {
-    return new MatchQueryBuilder(name, text, "match_phrase", operator, 1);
+  private static FulltextQueryBuilder matchPhraseQuery(String name, Object text) {
+    return new FulltextQueryBuilder(name, text, "match_phrase", ElasticsearchConstants.AND, 1);
   }
 
   /**
@@ -448,15 +448,15 @@ class QueryBuilders {
    * Case 3: "%foo bar%", match_phrase
    */
   static class RegexpQueryBuilder extends QueryBuilder {
-    private MatchQueryBuilder matchQueryBuilder;
+    private FulltextQueryBuilder fulltextQueryBuilder;
 
     RegexpQueryBuilder(final String fieldName, final String value) {
-      this.matchQueryBuilder = matchPhraseQuery(fieldName, value, ElasticsearchConstants.AND);
+      this.fulltextQueryBuilder = matchPhraseQuery(fieldName, value, ElasticsearchConstants.AND);
     }
 
     @Override
     void writeJson(final JsonGenerator generator) throws IOException {
-      this.matchQueryBuilder.writeJson(generator);
+      this.fulltextQueryBuilder.writeJson(generator);
     }
   }
 
@@ -531,7 +531,7 @@ class QueryBuilders {
   /**
    * A query that matches on condition
    */
-  static class MatchQueryBuilder extends QueryBuilder {
+  static class FulltextQueryBuilder extends QueryBuilder {
 
     private final String operator;
     private final long minimumShouldMatch;
@@ -539,7 +539,7 @@ class QueryBuilders {
     private final Object text;
     private final String fulltextMatchType;
 
-    private MatchQueryBuilder(String name, Object text, String fulltextMatchType, String operator, long minimumShouldMatch) {
+    private FulltextQueryBuilder(String name, Object text, String fulltextMatchType, String operator, long minimumShouldMatch) {
       this.name = name;
       this.text = text;
       this.fulltextMatchType = fulltextMatchType;
@@ -559,8 +559,10 @@ class QueryBuilders {
       generator.writeStartObject();
       generator.writeFieldName("query");
       generator.writeObject(text);
-      generator.writeFieldName("operator");
-      generator.writeString(operator);
+      if (operator != null) {
+        generator.writeFieldName("operator");
+        generator.writeString(operator);
+      }
       generator.writeFieldName("minimum_should_match");
       generator.writeNumber(minimumShouldMatch);
       generator.writeEndObject();
