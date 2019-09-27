@@ -69,6 +69,9 @@ interface ElasticsearchConstants {
     }
   };
 
+  /**
+   * Trim SQL like percent sign around
+   */
   static String trimPercentSign(RexLiteral rexNode) {
     String s = String.valueOf(rexNode.getValue());
     if (s.startsWith("%")) {
