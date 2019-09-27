@@ -615,6 +615,8 @@ class PredicateAnalyzer {
             return QueryExpression.create(pair.getKey()).gte(pair.getValue());
           }
           return QueryExpression.create(pair.getKey()).lte(pair.getValue());
+        case OTHER_FUNCTION:
+          if()
         default:
           break;
       }
