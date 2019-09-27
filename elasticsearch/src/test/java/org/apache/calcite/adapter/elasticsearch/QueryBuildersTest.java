@@ -199,6 +199,14 @@ public class QueryBuildersTest {
         toJson(QueryBuilders.matchQuery("foo", "bar quex", ElasticsearchConstants.OR)));
   }
 
+  @Test
+  public void matchPhrase() throws IOException {
+    assertEquals("{\"match_phrase\":{\"foo\":\"bar quex\"}}",
+        toJson(QueryBuilders.matchPhraseQuery("foo", "bar quex")));
+    assertEquals("{\"match_phrase\":{\"foo\":\"bar quex\"}}",
+        toJson(QueryBuilders.matchPhraseQuery("foo", "bar quex")));
+  }
+
   private String toJson(QueryBuilders.QueryBuilder builder) throws IOException {
     StringWriter writer = new StringWriter();
     JsonGenerator gen = mapper.getFactory().createGenerator(writer);
