@@ -618,8 +618,8 @@ class PredicateAnalyzer {
           return QueryExpression.create(pair.getKey()).lte(pair.getValue());
         case OTHER_FUNCTION:
           final SqlOperator operator = call.getOperator();
-          if (operator instanceof ElasticsearchConstants.EsMatchOperator) {
-            return QueryExpression.create(pair.getKey()).match(pair.getValue(), ((ElasticsearchConstants.EsMatchOperator) operator).getOperator());
+          if (operator instanceof ElasticsearchConstants.ElasticsearchMatchOperator) {
+            return QueryExpression.create(pair.getKey()).match(pair.getValue(), ((ElasticsearchConstants.ElasticsearchMatchOperator) operator).getOperator());
           }
         default:
           break;

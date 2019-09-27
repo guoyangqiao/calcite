@@ -60,11 +60,11 @@ interface ElasticsearchConstants {
     return "_MAP".equals(name);
   }
 
-  class EsMatchOperator extends SqlInOperator {
+  class ElasticsearchMatchOperator extends SqlInOperator {
 
     private final String operator;
 
-    EsMatchOperator(String name, String operator) {
+    ElasticsearchMatchOperator(String name, String operator) {
       super(name, SqlKind.OTHER_FUNCTION);
       this.operator = operator;
     }
@@ -79,9 +79,9 @@ interface ElasticsearchConstants {
     }
   }
 
-  SqlOperator MATCH_AND_SQL_OPERATOR = new EsMatchOperator(ES_MATCH_AND, AND);
+  SqlOperator MATCH_AND_SQL_OPERATOR = new ElasticsearchMatchOperator(ES_MATCH_AND, AND);
 
-  SqlOperator MATCH_OR_SQL_OPERATOR = new EsMatchOperator(ES_MATCH_OR, OR);
+  SqlOperator MATCH_OR_SQL_OPERATOR = new ElasticsearchMatchOperator(ES_MATCH_OR, OR);
 
   /**
    * Trim SQL like percent sign around
