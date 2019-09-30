@@ -317,14 +317,14 @@ class PredicateAnalyzer {
         @Override
         public RexNode visitCall(RexCall call) {
           if (filterTest.get()) {
-            return super.visitCall(call);
+            return call;
           }
           if (call.op.kind == SqlKind.EQUALS) {
             final RexNode ref = call.getOperands().get(0);
             final RexNode rexNode = call.getOperands().get(1);
             if (ref instanceof RexInputRef) {
               final int index = ((RexInputRef) ref).getIndex();
-              testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
+              final boolean b = testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping);
               if (filterTest.get()) {
                 nameHolder.set(((RexLiteral) rexNode));
                 return null;
@@ -340,7 +340,7 @@ class PredicateAnalyzer {
       probeProject.accept(new RexShuttle() {
         @Override
         public RexNode visitInputRef(RexInputRef inputRef) {
-          testFieldAccess(inputRef.getIndex(), PARENT_FIELD, probeProject, mapping, projectionTest);
+          projectionTest.set(testFieldAccess(inputRef.getIndex(), PARENT_FIELD, probeProject, mapping));
           return inputRef;
         }
       });
@@ -349,13 +349,13 @@ class PredicateAnalyzer {
     /**
      * test if a field is derived from a join and hold the right offset of the join
      *
-     * @param index            field to test
-     * @param targetField      should field name
-     * @param rootNode         root relNode
-     * @param mapping          ES mapping
-     * @param testResultHolder result holder
+     * @param index       field to test
+     * @param targetField should field name
+     * @param rootNode    root relNode
+     * @param mapping     ES mapping
+     * @return
      */
-    private void testFieldAccess(int index, String targetField, RelNode rootNode, ElasticsearchMapping mapping, AtomicBoolean testResultHolder) {
+    private boolean testFieldAccess(int index, String targetField, RelNode rootNode, ElasticsearchMapping mapping) {
       for (RelNode input = rootNode.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
         if (input instanceof Project) {
           final RexNode rexNode = ((Project) input).getProjects().get(index);
@@ -374,8 +374,7 @@ class PredicateAnalyzer {
                       if (operands1.size() == 2) {
                         final RexLiteral rexLiteral = (RexLiteral) operands1.get(1);
                         if (JOIN_TYPE.equalsIgnoreCase(mapping.mapping().get(rexLiteral.getValueAs(String.class)).name())) {
-                          testResultHolder.set(true);
-                          break;
+                          return true;
                         }
                       }
                     }
@@ -386,6 +385,7 @@ class PredicateAnalyzer {
           }
         }
       }
+      return false;
     }
 
     @Override
