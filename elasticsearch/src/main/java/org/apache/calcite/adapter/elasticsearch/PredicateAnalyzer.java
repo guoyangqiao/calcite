@@ -24,13 +24,18 @@ import org.apache.calcite.adapter.elasticsearch.QueryBuilders.QueryBuilder;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.RangeQueryBuilder;
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
 import org.apache.calcite.adapter.enumerable.EnumerableRel;
-import org.apache.calcite.plan.*;
+import org.apache.calcite.plan.ConventionTraitDef;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
-import org.apache.calcite.rel.core.*;
-import org.apache.calcite.rel.logical.*;
+import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.*;
@@ -45,7 +50,6 @@ import org.apache.calcite.util.Pair;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -312,7 +316,10 @@ class PredicateAnalyzer {
       return new RexShuttle() {
         @Override
         public RexNode visitCall(RexCall call) {
-          if (call.op.kind == SqlKind.EQUALS && !filterTest.get()) {
+          if (filterTest.get()) {
+            return call;
+          }
+          if (call.op.kind == SqlKind.EQUALS) {
             final RexNode ref = call.getOperands().get(0);
             final RexNode rexNode = call.getOperands().get(1);
             if (ref instanceof RexInputRef) {
