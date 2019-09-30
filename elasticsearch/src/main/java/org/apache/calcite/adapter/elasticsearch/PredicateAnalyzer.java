@@ -317,7 +317,7 @@ class PredicateAnalyzer {
         @Override
         public RexNode visitCall(RexCall call) {
           if (filterTest.get()) {
-            return call;
+            return super.visitCall(call);
           }
           if (call.op.kind == SqlKind.EQUALS) {
             final RexNode ref = call.getOperands().get(0);
