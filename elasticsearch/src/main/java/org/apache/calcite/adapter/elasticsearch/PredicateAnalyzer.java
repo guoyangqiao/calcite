@@ -329,7 +329,7 @@ class PredicateAnalyzer {
                 filterTest.set(true);
                 nameHolder.set(((RexLiteral) rexNode));
                 final RexBuilder rexBuilder = finalProbeFilter.getCluster().getRexBuilder();
-                return rexBuilder.makeLiteral(true);
+                return rexBuilder.makeLiteral(true);//ignore this condition in es grammar builder
               }
             }
           }
