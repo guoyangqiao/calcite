@@ -34,7 +34,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.type.RelDataType;
@@ -214,13 +213,12 @@ class PredicateAnalyzer {
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
-                        final RelNode boxedRel = RelFactories.LOGICAL_BUILDER.create(subQueryNode.getCluster(), null).push(subQueryNode).project(subQueryNode.getCluster().getRexBuilder().identityProjects(subQueryNode.getRowType()), ImmutableList.of(), true).build();
                         final RexLiteral literal = testFilter(
                             filterTest,
-                            boxedRel,
+                            subQueryNode,
                             elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
-                          final EnumerableRel enumerableRel = implSubquery(boxedRel);
+                          final EnumerableRel enumerableRel = implSubquery(subQueryNode);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
                             RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
                             while (!(esRoot instanceof Filter)) {
