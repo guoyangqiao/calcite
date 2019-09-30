@@ -47,6 +47,7 @@ import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.Pair;
 
 import java.util.*;
@@ -221,7 +222,7 @@ class PredicateAnalyzer {
                             boxedRel,
                             elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
-                          final EnumerableRel enumerableRel = implSubquery(rexLiteralRelNodePair.right.getInput(0));
+                          final EnumerableRel enumerableRel = implSubquery(rexLiteralRelNodePair.right);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
                             RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
                             while (!(esRoot instanceof Filter)) {
@@ -289,12 +290,13 @@ class PredicateAnalyzer {
      */
     private Pair<RexLiteral, RelNode> testFilter(AtomicBoolean filterTest, final RelNode subQueryNode, ElasticsearchMapping mapping) {
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
-      for (RelNode current = subQueryNode; !(current instanceof TableScan); current = current.getInput(0)) {
+      for (RelNode current = subQueryNode, previous = null; !(current instanceof TableScan); previous = current, current = current.getInput(0)) {
         if (current instanceof Filter) {
           final RelNode refinedFilter = current.accept(getShuttle(filterTest, mapping, nameHolder, current));
           if (current != refinedFilter) {
             //ok we find the key, now we can return
-
+            previous.replaceInput(0, refinedFilter);
+            break;
           }
         }
       }
