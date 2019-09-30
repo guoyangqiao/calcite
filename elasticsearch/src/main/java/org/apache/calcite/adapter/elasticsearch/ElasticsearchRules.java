@@ -368,8 +368,9 @@ class ElasticsearchRules {
               return ((RexInputRef) rexNode).getIndex();
             }
           } catch (Throwable t) {
+            //desire failed
           }
-          return -1
+          return -1;
         }
       }).collect(Collectors.toSet()).size() > 1;
     }
