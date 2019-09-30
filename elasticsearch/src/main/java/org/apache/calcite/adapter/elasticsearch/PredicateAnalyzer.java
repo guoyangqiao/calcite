@@ -325,9 +325,11 @@ class PredicateAnalyzer {
             if (ref instanceof RexInputRef) {
               final int index = ((RexInputRef) ref).getIndex();
               final boolean b = testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping);
-              if (filterTest.get()) {
+              if (b) {
+                filterTest.set(true);
                 nameHolder.set(((RexLiteral) rexNode));
-                return null;
+                final RexBuilder rexBuilder = finalProbeFilter.getCluster().getRexBuilder();
+                return rexBuilder.makeLiteral(true);
               }
             }
           }
