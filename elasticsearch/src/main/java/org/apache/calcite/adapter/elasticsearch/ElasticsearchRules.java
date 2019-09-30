@@ -361,7 +361,7 @@ class ElasticsearchRules {
     private boolean equivalentInput(List<RexNode> conditionGroup) {
       return conditionGroup.stream().map(x -> {
         if (x instanceof RexCall) {
-          final RexNode rexNode = ((RexCall) x).getOperands().get(0);
+          final RexNode rexNode = (RexNode) ((List) ((RexCall) ((List) ((RexCall) ((List) ((RexCall) x).operands).get(0)).operands).get(0)).operands).get(0);
           if (rexNode instanceof RexInputRef) {
             return ((RexInputRef) rexNode).getIndex();
           }
