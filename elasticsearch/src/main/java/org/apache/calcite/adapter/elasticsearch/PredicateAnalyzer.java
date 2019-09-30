@@ -292,7 +292,10 @@ class PredicateAnalyzer {
       for (RelNode current = subQueryNode; !(current instanceof TableScan); current = current.getInput(0)) {
         if (current instanceof Filter) {
           final RelNode refinedFilter = current.accept(getShuttle(filterTest, mapping, nameHolder, current));
+          if (current != refinedFilter) {
+            //ok we find the key, now we can return
 
+          }
         }
       }
       return new Pair<>(nameHolder.get(), subQueryNode);
