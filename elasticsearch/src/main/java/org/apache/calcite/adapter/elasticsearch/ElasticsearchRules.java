@@ -372,7 +372,7 @@ class ElasticsearchRules {
           }
         }
         return -1;
-      }).collect(Collectors.toSet()).size() > 1;
+      }).collect(Collectors.toSet()).size() == 1;
     }
 
     private boolean allLike(List<RexNode> conditionGroup) {
