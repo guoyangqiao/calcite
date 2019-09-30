@@ -47,7 +47,6 @@ import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.util.Pair;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -216,7 +215,7 @@ class PredicateAnalyzer {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
                         final RelNode boxedRel = RelFactories.LOGICAL_BUILDER.create(subQueryNode.getCluster(), null).push(subQueryNode).project(subQueryNode.getCluster().getRexBuilder().identityProjects(subQueryNode.getRowType()), ImmutableList.of(), true).build();
-                        final RexLiteral rexLiteralRelNodePair = testFilter(
+                        final RexLiteral literal = testFilter(
                             filterTest,
                             boxedRel,
                             elasticsearchTable.transport.mapping);
@@ -232,7 +231,7 @@ class PredicateAnalyzer {
                               final RexNode condition = ((ElasticsearchFilter) esRoot).getCondition();
                               final Expression accept = condition.accept(this);
                               if (accept instanceof QueryExpression) {
-                                return new SimpleQueryExpression(null).hasChild((LiteralExpression) rexLiteralRelNodePair.left.accept(this), (QueryExpression) accept);
+                                return new SimpleQueryExpression(null).hasChild((LiteralExpression) literal.accept(this), (QueryExpression) accept);
                               }
                             } else {
                               throw new PredicateAnalyzerException("Unsupported match all has child query");
