@@ -309,32 +309,22 @@ class PredicateAnalyzer {
     }
 
     private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, RelNode finalProbeFilter) {
-      final int initLayer = 1;
-      final AtomicInteger depth = new AtomicInteger(initLayer);
       return new RexShuttle() {
         @Override
         public RexNode visitCall(RexCall call) {
-          if (depth.get() >= 0) {
-            if (call.op.kind == SqlKind.EQUALS && !filterTest.get()) {
-              final RexNode ref = call.getOperands().get(0);
-              final RexNode rexNode = call.getOperands().get(1);
-              if (ref instanceof RexInputRef) {
-                final int index = ((RexInputRef) ref).getIndex();
-                testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
-                if (filterTest.get()) {
-                  nameHolder.set(((RexLiteral) rexNode));
-                  if (depth.get() != initLayer) {
-                    return null;
-                  }
-                }
+          if (call.op.kind == SqlKind.EQUALS && !filterTest.get()) {
+            final RexNode ref = call.getOperands().get(0);
+            final RexNode rexNode = call.getOperands().get(1);
+            if (ref instanceof RexInputRef) {
+              final int index = ((RexInputRef) ref).getIndex();
+              testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
+              if (filterTest.get()) {
+                nameHolder.set(((RexLiteral) rexNode));
               }
-              return call;
-            } else {
-              depth.decrementAndGet();
-              return call.clone(call.getType(), call.getOperands().stream().map(x -> x.accept(this)).filter(Objects::nonNull).collect(Collectors.toList()));
             }
+            return call;
           }
-          return call;
+          returnk super.visitCall(call);
         }
       };
     }
@@ -1261,6 +1251,7 @@ class PredicateAnalyzer {
     Object rawValue() {
       return literal.getValue();
     }
+
   }
 
   /**
