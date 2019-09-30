@@ -324,8 +324,7 @@ class PredicateAnalyzer {
             final RexNode rexNode = call.getOperands().get(1);
             if (ref instanceof RexInputRef) {
               final int index = ((RexInputRef) ref).getIndex();
-              final boolean b = testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping);
-              if (b) {
+              if (testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping)) {
                 filterTest.set(true);
                 nameHolder.set(((RexLiteral) rexNode));
                 return finalProbeFilter.getCluster().getRexBuilder().makeLiteral(true);//mute this condition in es grammar builder
