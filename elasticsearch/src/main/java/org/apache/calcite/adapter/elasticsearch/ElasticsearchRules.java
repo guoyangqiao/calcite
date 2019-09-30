@@ -323,7 +323,7 @@ class ElasticsearchRules {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-      final ElasticsearchFilter rel = call.rel(0);
+      final Filter rel = call.rel(0);
       final RexBuilder rexBuilder = call.builder().getRexBuilder();
       final RexShuttle shuttle = new RexShuttle() {
         @Override
