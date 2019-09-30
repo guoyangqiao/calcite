@@ -355,6 +355,9 @@ class ElasticsearchRules {
         }
       };
       final RelNode accept = rel.accept(shuttle);
+      if (accept != rel) {
+        call.getPlanner().setImportance(rel, 0D);
+      }
       call.transformTo(accept);
     }
 
