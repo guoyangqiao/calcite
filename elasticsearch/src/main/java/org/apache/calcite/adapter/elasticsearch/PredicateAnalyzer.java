@@ -35,6 +35,7 @@ import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -288,25 +289,10 @@ class PredicateAnalyzer {
      */
     private Pair<RexLiteral, RelNode> testFilter(AtomicBoolean filterTest, final RelNode subQueryNode, ElasticsearchMapping mapping) {
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
-      RelNode previous = null;
-      RelNode current = subQueryNode;
-      while (current.getInputs().size() != 0) {
+      for (RelNode current = subQueryNode; !(current instanceof TableScan); current = current.getInput(0)) {
         if (current instanceof Filter) {
           final RelNode refinedFilter = current.accept(getShuttle(filterTest, mapping, nameHolder, current));
-          assert previous != null;
-          if (refinedFilter == current) {
-            //should point to next rel
-            previous.replaceInput(0, current.getInput(0));
-            current = current.getInput(0);
-          } else {
-            //just replace current rel
-            previous.replaceInput(0, refinedFilter);
-            previous = refinedFilter;
-            current = refinedFilter.getInput(0);
-          }
-        } else {
-          previous = current;
-          current = current.getInput(0);
+
         }
       }
       return new Pair<>(nameHolder.get(), subQueryNode);
