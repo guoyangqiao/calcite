@@ -330,7 +330,6 @@ class PredicateAnalyzer {
                 return null;
               }
             }
-            return call;
           }
           return super.visitCall(call);
         }
