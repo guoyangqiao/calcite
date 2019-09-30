@@ -324,7 +324,7 @@ class PredicateAnalyzer {
             }
             return call;
           }
-          returnk super.visitCall(call);
+          return super.visitCall(call);
         }
       };
     }
