@@ -335,7 +335,7 @@ class ElasticsearchRules {
                 final String matchStr = conditionGroup.stream().map(x -> {
                   final RexNode rexNode = ((RexCall) x).getOperands().get(1);
                   if (rexNode instanceof RexLiteral) {
-                    return ElasticsearchConstants.trimPercentSign(String.valueOf(((RexLiteral) rexNode).getValue()));
+                    return ElasticsearchConstants.trimPercentSign(((RexLiteral) rexNode).getValueAs(String.class));
                   }
                   throw new IllegalArgumentException("Not compatible with non literal");
                 }).collect(Collectors.joining(ElasticsearchConstants.WHITE_SPACE));
