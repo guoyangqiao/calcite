@@ -24,6 +24,7 @@ import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
+import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
@@ -317,7 +318,7 @@ class ElasticsearchRules {
     private static final ElasticsearchFilterLikeToMatchRule INSTANCE = new ElasticsearchFilterLikeToMatchRule();
 
     ElasticsearchFilterLikeToMatchRule() {
-      super(operand(ElasticsearchFilter.class, any()), "ElasticsearchFilterLikeToMatchRule");
+      super(operand(Filter.class, any()), "ElasticsearchFilterLikeToMatchRule");
     }
 
     @Override
@@ -355,9 +356,6 @@ class ElasticsearchRules {
         }
       };
       final RelNode accept = rel.accept(shuttle);
-      if (accept != rel) {
-        call.getPlanner().setImportance(rel, 0D);
-      }
       call.transformTo(accept);
     }
 
