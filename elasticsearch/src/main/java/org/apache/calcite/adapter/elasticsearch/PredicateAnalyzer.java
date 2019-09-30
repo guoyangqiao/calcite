@@ -327,6 +327,7 @@ class PredicateAnalyzer {
               testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping, filterTest);
               if (filterTest.get()) {
                 nameHolder.set(((RexLiteral) rexNode));
+                return null;
               }
             }
             return call;
