@@ -1088,7 +1088,7 @@ class PredicateAnalyzer {
     @Override
     public QueryExpression match(LiteralExpression literal, String operator) {
       builder = QueryBuilders.matchQuery(getFieldReference(), literal.stringValue(), operator);
-      return null;
+      return this;
     }
 
     @Override
