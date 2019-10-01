@@ -454,7 +454,6 @@ class PredicateAnalyzer {
             case CAST:
               return toCastExpression(call);
             case LIKE:
-              return binary(call);
             case OTHER_FUNCTION:
               return binary(call);
             default:
