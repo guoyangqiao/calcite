@@ -400,7 +400,7 @@ class PredicateAnalyzer {
               return true;
             case OTHER_FUNCTION:
               final String operator = call.getOperator().getName();
-              if (ElasticsearchConstants.AND.equalsIgnoreCase(operator) || ElasticsearchConstants.OR.equalsIgnoreCase(operator)) {
+              if (ElasticsearchConstants.ES_MATCH_AND.equalsIgnoreCase(operator) || ElasticsearchConstants.ES_MATCH_OR.equalsIgnoreCase(operator)) {
                 return true;
               }
             default:
