@@ -455,6 +455,8 @@ class PredicateAnalyzer {
               return toCastExpression(call);
             case LIKE:
               return binary(call);
+            case OTHER_FUNCTION:
+              return binary(call);
             default:
               // manually process ITEM($0, 'foo') which in our case will be named attribute
               if (call.getOperator().getName().equalsIgnoreCase("ITEM")) {

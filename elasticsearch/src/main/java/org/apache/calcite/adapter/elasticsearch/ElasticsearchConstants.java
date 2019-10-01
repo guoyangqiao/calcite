@@ -74,7 +74,7 @@ interface ElasticsearchConstants {
 
     @Override
     public SqlSyntax getSyntax() {
-      return SqlSyntax.BINARY;
+      return SqlSyntax.SPECIAL;
     }
   }
 
