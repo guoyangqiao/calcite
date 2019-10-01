@@ -398,6 +398,11 @@ class PredicateAnalyzer {
             case LESS_THAN:
             case LESS_THAN_OR_EQUAL:
               return true;
+            case OTHER_FUNCTION:
+              final String operator = call.getOperator().getName();
+              if (ElasticsearchConstants.AND.equalsIgnoreCase(operator) || ElasticsearchConstants.OR.equalsIgnoreCase(operator)) {
+                return true;
+              }
             default:
               return false;
           }
@@ -454,7 +459,6 @@ class PredicateAnalyzer {
             case CAST:
               return toCastExpression(call);
             case LIKE:
-            case OTHER_FUNCTION:
               return binary(call);
             default:
               // manually process ITEM($0, 'foo') which in our case will be named attribute
