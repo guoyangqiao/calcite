@@ -23,6 +23,21 @@ limitations under the License.
     <version>1.21.0-SNAPSHOT</version>
   </parent>
 
+
+  <distributionManagement>
+    <repository>
+      <id>nexus</id>
+      <name>Nexus</name>
+      <url>http://ci.yunat.com:8091/nexus/content/repositories/release_scs</url>
+    </repository>
+    <snapshotRepository>
+      <id>nexus</id>
+      <name>Nexus</name>
+      <url>http://ci.yunat.com:8091/nexus/content/repositories/snapshots_scs</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <groupId>com.shuyun.kunkka</groupId>
   <artifactId>calcite-core</artifactId>
   <packaging>jar</packaging>
   <version>1.21.0-SNAPSHOT</version>

@@ -32,3 +32,28 @@
     }
   }
 -->
+
+SqlCall DateAddFunctionCall() :
+{
+List<SqlNode> args;
+    SqlNode e;
+    final Span s;
+    TimeUnit interval;
+    SqlNode node;
+    }
+    {
+    <DATE_ADD> { s = span(); }
+        <LPAREN>
+            interval = TimestampInterval() {
+            args = startList(SqlLiteral.createSymbol(interval, getPos()));
+            }
+            <COMMA>
+                e = Expression(ExprContext.ACCEPT_SUB_QUERY) { args.add(e); }
+                <COMMA>
+                    e = Expression(ExprContext.ACCEPT_SUB_QUERY) { args.add(e); }
+                    <RPAREN> {
+                        return SqlStdOperatorTable.DATE_ADD.createCall(
+                        s.end(this), args);
+                        }
+                        }
+
