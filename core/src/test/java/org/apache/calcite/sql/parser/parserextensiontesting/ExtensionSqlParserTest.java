@@ -20,7 +20,6 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParserImplFactory;
 import org.apache.calcite.sql.parser.SqlParserTest;
-
 import org.hamcrest.core.IsNull;
 import org.junit.Test;
 
@@ -39,6 +38,11 @@ public class ExtensionSqlParserTest extends SqlParserTest {
   @Test public void testAlterSystemExtension() throws SqlParseException {
     check("alter system upload jar '/path/to/jar'",
         "ALTER SYSTEM UPLOAD JAR '/path/to/jar'");
+  }
+
+  @Test public void testDateAddFunction() throws SqlParseException {
+    check("select date_add(day, 1 ,current_timestamp)",
+        "SELECT DATE_ADD(DAY, 1, CURRENT_TIMESTAMP)");
   }
 
   @Test public void testAlterSystemExtensionWithoutAlter() throws SqlParseException {

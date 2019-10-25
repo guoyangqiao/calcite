@@ -364,7 +364,7 @@ data: {
       # Return type of method implementation should be "SqlNode".
       # Example: DateFunctionCall().
       builtinFunctionCallMethods: [
-        DateAddFunctionCall()
+        "DateAddFunctionCall()"
       ]
 
       # List of methods for parsing extensions to "ALTER <scope>" calls.
