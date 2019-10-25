@@ -30,6 +30,7 @@ data: {
       keywords: [
         "UPLOAD"
         "JAR"
+        "DATE_ADD"
       ]
 
       # List of keywords from "keywords" section that are not reserved.
@@ -362,6 +363,7 @@ data: {
       # Return type of method implementation should be "SqlNode".
       # Example: DateFunctionCall().
       builtinFunctionCallMethods: [
+        DateAddFunctionCall()
       ]
 
       # List of methods for parsing extensions to "ALTER <scope>" calls.
