@@ -23,7 +23,8 @@ data: {
       imports: [
         "org.apache.calcite.sql.SqlCreate",
         "org.apache.calcite.sql.parser.parserextensiontesting.SqlCreateTable",
-        "org.apache.calcite.sql.parser.parserextensiontesting.SqlUploadJarNode"
+        "org.apache.calcite.sql.parser.parserextensiontesting.SqlUploadJarNode",
+        "org.apache.calcite.sql.fun.SqlDateAddFunction"
       ]
 
       # List of keywords.
