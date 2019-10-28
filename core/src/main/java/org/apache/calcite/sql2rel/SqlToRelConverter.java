@@ -16,53 +16,20 @@
  */
 package org.apache.calcite.sql2rel;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList.Builder;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import org.apache.calcite.avatica.util.Spaces;
 import org.apache.calcite.linq4j.Ord;
-import org.apache.calcite.plan.Convention;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelOptSamplingParameters;
-import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.plan.ViewExpanders;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.prepare.RelOptTableImpl;
-import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelCollations;
-import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.rel.SingleRel;
-import org.apache.calcite.rel.core.AggregateCall;
-import org.apache.calcite.rel.core.Collect;
-import org.apache.calcite.rel.core.CorrelationId;
-import org.apache.calcite.rel.core.Filter;
-import org.apache.calcite.rel.core.Join;
-import org.apache.calcite.rel.core.JoinInfo;
-import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.core.RelFactories;
-import org.apache.calcite.rel.core.Sample;
-import org.apache.calcite.rel.core.Sort;
-import org.apache.calcite.rel.core.TableScan;
-import org.apache.calcite.rel.core.Uncollect;
-import org.apache.calcite.rel.core.Values;
-import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.logical.LogicalCorrelate;
-import org.apache.calcite.rel.logical.LogicalFilter;
-import org.apache.calcite.rel.logical.LogicalIntersect;
-import org.apache.calcite.rel.logical.LogicalJoin;
-import org.apache.calcite.rel.logical.LogicalMatch;
-import org.apache.calcite.rel.logical.LogicalMinus;
-import org.apache.calcite.rel.logical.LogicalProject;
-import org.apache.calcite.rel.logical.LogicalSort;
-import org.apache.calcite.rel.logical.LogicalTableFunctionScan;
-import org.apache.calcite.rel.logical.LogicalTableModify;
-import org.apache.calcite.rel.logical.LogicalTableScan;
-import org.apache.calcite.rel.logical.LogicalUnion;
-import org.apache.calcite.rel.logical.LogicalValues;
+import org.apache.calcite.rel.*;
+import org.apache.calcite.rel.core.*;
+import org.apache.calcite.rel.logical.*;
 import org.apache.calcite.rel.metadata.JaninoRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelColumnMapping;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -71,72 +38,10 @@ import org.apache.calcite.rel.stream.LogicalDelta;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexCall;
-import org.apache.calcite.rex.RexCallBinding;
-import org.apache.calcite.rex.RexCorrelVariable;
-import org.apache.calcite.rex.RexDynamicParam;
-import org.apache.calcite.rex.RexFieldAccess;
-import org.apache.calcite.rex.RexFieldCollation;
-import org.apache.calcite.rex.RexInputRef;
-import org.apache.calcite.rex.RexLiteral;
-import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexPatternFieldRef;
-import org.apache.calcite.rex.RexRangeRef;
-import org.apache.calcite.rex.RexShuttle;
-import org.apache.calcite.rex.RexSubQuery;
-import org.apache.calcite.rex.RexUtil;
-import org.apache.calcite.rex.RexWindowBound;
-import org.apache.calcite.schema.ColumnStrategy;
-import org.apache.calcite.schema.ModifiableTable;
-import org.apache.calcite.schema.ModifiableView;
-import org.apache.calcite.schema.Table;
-import org.apache.calcite.schema.TranslatableTable;
-import org.apache.calcite.schema.Wrapper;
-import org.apache.calcite.sql.JoinConditionType;
-import org.apache.calcite.sql.JoinType;
-import org.apache.calcite.sql.SqlAggFunction;
-import org.apache.calcite.sql.SqlBasicCall;
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlCallBinding;
-import org.apache.calcite.sql.SqlDataTypeSpec;
-import org.apache.calcite.sql.SqlDelete;
-import org.apache.calcite.sql.SqlDynamicParam;
-import org.apache.calcite.sql.SqlExplainFormat;
-import org.apache.calcite.sql.SqlExplainLevel;
-import org.apache.calcite.sql.SqlFunction;
-import org.apache.calcite.sql.SqlIdentifier;
-import org.apache.calcite.sql.SqlInsert;
-import org.apache.calcite.sql.SqlIntervalQualifier;
-import org.apache.calcite.sql.SqlJoin;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlLiteral;
-import org.apache.calcite.sql.SqlMatchRecognize;
-import org.apache.calcite.sql.SqlMerge;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlNodeList;
-import org.apache.calcite.sql.SqlNumericLiteral;
-import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.SqlOperatorTable;
-import org.apache.calcite.sql.SqlOrderBy;
-import org.apache.calcite.sql.SqlSampleSpec;
-import org.apache.calcite.sql.SqlSelect;
-import org.apache.calcite.sql.SqlSelectKeyword;
-import org.apache.calcite.sql.SqlSetOperator;
-import org.apache.calcite.sql.SqlSnapshot;
-import org.apache.calcite.sql.SqlUnnestOperator;
-import org.apache.calcite.sql.SqlUpdate;
-import org.apache.calcite.sql.SqlUtil;
-import org.apache.calcite.sql.SqlValuesOperator;
-import org.apache.calcite.sql.SqlWindow;
-import org.apache.calcite.sql.SqlWith;
-import org.apache.calcite.sql.SqlWithItem;
-import org.apache.calcite.sql.fun.SqlCase;
-import org.apache.calcite.sql.fun.SqlCountAggFunction;
-import org.apache.calcite.sql.fun.SqlInOperator;
-import org.apache.calcite.sql.fun.SqlQuantifyOperator;
-import org.apache.calcite.sql.fun.SqlRowOperator;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.rex.*;
+import org.apache.calcite.schema.*;
+import org.apache.calcite.sql.*;
+import org.apache.calcite.sql.fun.*;
 import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -144,65 +49,19 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.type.TableFunctionReturnTypeInference;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.sql.util.SqlVisitor;
-import org.apache.calcite.sql.validate.AggregatingSelectScope;
-import org.apache.calcite.sql.validate.CollectNamespace;
-import org.apache.calcite.sql.validate.DelegatingScope;
-import org.apache.calcite.sql.validate.ListScope;
-import org.apache.calcite.sql.validate.MatchRecognizeScope;
-import org.apache.calcite.sql.validate.ParameterScope;
-import org.apache.calcite.sql.validate.SelectScope;
-import org.apache.calcite.sql.validate.SqlMonotonicity;
-import org.apache.calcite.sql.validate.SqlNameMatcher;
-import org.apache.calcite.sql.validate.SqlQualified;
-import org.apache.calcite.sql.validate.SqlUserDefinedTableFunction;
-import org.apache.calcite.sql.validate.SqlUserDefinedTableMacro;
-import org.apache.calcite.sql.validate.SqlValidator;
-import org.apache.calcite.sql.validate.SqlValidatorImpl;
-import org.apache.calcite.sql.validate.SqlValidatorNamespace;
-import org.apache.calcite.sql.validate.SqlValidatorScope;
-import org.apache.calcite.sql.validate.SqlValidatorTable;
-import org.apache.calcite.sql.validate.SqlValidatorUtil;
+import org.apache.calcite.sql.validate.*;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.calcite.util.ImmutableBitSet;
-import org.apache.calcite.util.ImmutableIntList;
-import org.apache.calcite.util.Litmus;
-import org.apache.calcite.util.NlsString;
-import org.apache.calcite.util.NumberUtil;
-import org.apache.calcite.util.Pair;
-import org.apache.calcite.util.Util;
+import org.apache.calcite.util.*;
 import org.apache.calcite.util.trace.CalciteTrace;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableList.Builder;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-
 import org.slf4j.Logger;
 
+import javax.annotation.Nonnull;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
-import java.util.AbstractList;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 
 import static org.apache.calcite.sql.SqlUtil.stripAs;
 
@@ -219,6 +78,14 @@ public class SqlToRelConverter {
 
   protected static final Logger SQL2REL_LOGGER =
       CalciteTrace.getSqlToRelTracer();
+
+
+  private static final Set<SqlKind> KEEP_ORIGIN_OP = new HashSet<SqlKind>() {
+    {
+      add(SqlKind.IN);
+      add(SqlKind.NOT_IN);
+    }
+  };
 
   private static final BigDecimal TWO = BigDecimal.valueOf(2L);
 
@@ -745,7 +612,7 @@ public class SqlToRelConverter {
         RelDataTypeField field = fields.get(i);
         undoProjects.add(
             Pair.of(
-                (RexNode) new RexInputRef(
+                new RexInputRef(
                     squished.get(origin), field.getType()),
                 field.getName()));
       }
@@ -1431,6 +1298,10 @@ public class SqlToRelConverter {
       final List<RexNode> leftKeys,
       SqlNodeList valuesList,
       SqlInOperator op) {
+    RexNode inNode = specialHandleIn(bb, leftKeys, valuesList, op);
+    if (inNode != null) {
+      return inNode;
+    }
     final List<RexNode> comparisons = new ArrayList<>();
     for (SqlNode rightVals : valuesList) {
       RexNode rexComparison;
@@ -1475,6 +1346,25 @@ public class SqlToRelConverter {
     default:
       throw new AssertionError();
     }
+  }
+
+  /**
+   * Keep in original
+   */
+  private RexNode specialHandleIn(Blackboard bb, List<RexNode> leftKeys, SqlNodeList valuesList, SqlInOperator op) {
+    assert leftKeys.size() == 1;
+    assert op != null;
+    if (!KEEP_ORIGIN_OP.contains(op.kind)) {
+      return null;
+    }
+    final List<RexNode> rexNodes = new ArrayList<>();
+    rexNodes.add(leftKeys.get(0));
+    for (SqlNode sqlNode : valuesList) {
+      final RexNode rexNode = bb.convertExpression(sqlNode);
+      assert rexNode != null;
+      rexNodes.add(rexNode);
+    }
+    return rexBuilder.makeCall(op, ImmutableList.copyOf(rexNodes));
   }
 
   /** Ensures that an expression has a given {@link SqlTypeName}, applying a
@@ -2865,7 +2755,7 @@ public class SqlToRelConverter {
         // at all.  The rest of the system doesn't like 0-tuples, so we
         // select a dummy constant here.
         final RexNode zero = rexBuilder.makeExactLiteral(BigDecimal.ZERO);
-        preExprs = ImmutableList.of(Pair.of(zero, (String) null));
+        preExprs = ImmutableList.of(Pair.of(zero, null));
       }
 
       final RelNode inputRel = bb.root;
@@ -4708,9 +4598,7 @@ public class SqlToRelConverter {
         RexCall call = (RexCall) rex;
         if (call.getOperator() == SqlStdOperatorTable.CAST) {
           RexNode operand = call.getOperands().get(0);
-          if (operand instanceof RexLiteral) {
-            return true;
-          }
+          return operand instanceof RexLiteral;
         }
       }
       return false;
@@ -4818,7 +4706,7 @@ public class SqlToRelConverter {
     }
 
     public RexFieldAccess getFieldAccess(CorrelationId name) {
-      return (RexFieldAccess) bb.mapCorrelateToRex.get(name);
+      return bb.mapCorrelateToRex.get(name);
     }
 
     public String getOriginalRelName() {
