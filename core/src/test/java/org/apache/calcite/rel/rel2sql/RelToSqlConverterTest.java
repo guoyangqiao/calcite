@@ -184,6 +184,14 @@ public class RelToSqlConverterTest {
     return sqlNode.toSqlString(dialect).getSql();
   }
 
+  /**
+   * The origin implement of <code>in</code> is converted to <code>or</code>
+   */
+  @Test public void testInConvertedToIn() {
+    String query = "select * from \"product\" where product_id in (10,20,30,40)";
+    sql(query).ok("SELECT *\nFROM \"foodmart\".\"product\"");
+  }
+
   @Test public void testSimpleSelectStarFromProductTable() {
     String query = "select * from \"product\"";
     sql(query).ok("SELECT *\nFROM \"foodmart\".\"product\"");

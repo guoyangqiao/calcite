@@ -5,6 +5,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.ArraySqlType;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * A list of {@link RexNode}.
@@ -25,6 +26,7 @@ public class RexList extends RexNode {
   public RexList(List<RexNode> elements) {
     assert elements != null && elements.size() > 0;
     this.elements = elements;
+    this.digest = elements.stream().map(e -> e.digest).collect(Collectors.joining(", "));
   }
 
   @Override
@@ -50,5 +52,10 @@ public class RexList extends RexNode {
   @Override
   public int hashCode() {
     return elements.hashCode();
+  }
+
+  @Override
+  public String toString() {
+    return digest;
   }
 }
