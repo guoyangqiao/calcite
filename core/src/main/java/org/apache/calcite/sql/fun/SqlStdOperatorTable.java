@@ -287,7 +287,7 @@ public class SqlStdOperatorTable extends ReflectiveSqlOperatorTable {
           true,
           ReturnTypes.BOOLEAN_NULLABLE,
           InferTypes.FIRST_KNOWN,
-          OperandTypes.COMPARABLE_UNORDERED_COMPARABLE_UNORDERED);
+          OperandTypes.ANY_ANY);
 
 
   /**
