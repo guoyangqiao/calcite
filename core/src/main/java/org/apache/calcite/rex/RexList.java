@@ -1,5 +1,6 @@
 package org.apache.calcite.rex;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.ArraySqlType;
 
@@ -8,6 +9,13 @@ import java.util.List;
 public class RexList extends RexNode {
 
   public final List<RexNode> elements;
+
+  public static RexList of(RexNode... rexNodes){
+    return of(ImmutableList.copyOf(rexNodes));
+  }
+  public static RexList of(List<RexNode> rexNodes){
+    return new RexList(ImmutableList.copyOf(rexNodes));
+  }
 
   public RexList(List<RexNode> elements) {
     assert elements != null && elements.size() > 0;

@@ -88,11 +88,13 @@ public class RexShuttle implements RexVisitor<RexNode> {
     }
   }
 
-  @Override public RexNode visitTableInputRef(RexTableInputRef ref) {
+  @Override
+  public RexNode visitTableInputRef(RexTableInputRef ref) {
     return ref;
   }
 
-  @Override public RexNode visitPatternFieldRef(RexPatternFieldRef fieldRef) {
+  @Override
+  public RexNode visitPatternFieldRef(RexPatternFieldRef fieldRef) {
     return fieldRef;
   }
 
@@ -227,9 +229,14 @@ public class RexShuttle implements RexVisitor<RexNode> {
     return rangeRef;
   }
 
-  @Override
   public RexNode visitList(RexList list) {
-    return list;
+    boolean[] update = {false};
+    final List<RexNode> rexNodes = visitList(list.elements, update);
+    if (update[0]) {
+      return RexList.of(rexNodes);
+    } else {
+      return list;
+    }
   }
 
   /**

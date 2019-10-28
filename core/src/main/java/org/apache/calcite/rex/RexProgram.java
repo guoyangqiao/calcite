@@ -16,13 +16,11 @@
  */
 package org.apache.calcite.rex;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Ordering;
 import org.apache.calcite.plan.RelOptPredicateList;
 import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollations;
-import org.apache.calcite.rel.RelFieldCollation;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelWriter;
+import org.apache.calcite.rel.*;
 import org.apache.calcite.rel.externalize.RelWriterImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -33,18 +31,9 @@ import org.apache.calcite.util.Litmus;
 import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Permutation;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Ordering;
-
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.AbstractList;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * A collection of expressions which read inputs, compute output expressions,
@@ -926,6 +915,11 @@ public class RexProgram {
       return new RexFieldAccess(
           referenceExpr,
           fieldAccess.getField());
+    }
+
+    @Override
+    public RexNode visitList(RexList list) {
+      return list;
     }
   }
 

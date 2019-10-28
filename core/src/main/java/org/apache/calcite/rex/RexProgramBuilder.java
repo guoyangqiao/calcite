@@ -24,11 +24,7 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.util.Litmus;
 import org.apache.calcite.util.Pair;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Workspace for constructing a {@link RexProgram}.
@@ -916,6 +912,12 @@ public class RexProgramBuilder {
       final RexNode expr = super.visitCorrelVariable(variable);
       return registerInternal(expr, false);
     }
+
+    @Override
+    public RexNode visitList(RexList list) {
+      final RexNode expr = super.visitList(list);
+      return registerInternal(expr, false);
+    }
   }
 
   /**
@@ -935,11 +937,9 @@ public class RexProgramBuilder {
       if (valid) {
         // The expression should already be valid. Check that its
         // index is within bounds.
-        if ((index < 0) || (index >= inputRowType.getFieldCount())) {
-          assert false
-              : "RexInputRef index " + index + " out of range 0.."
-              + (inputRowType.getFieldCount() - 1);
-        }
+        assert (index >= 0) && (index < inputRowType.getFieldCount())
+            : "RexInputRef index " + index + " out of range 0.."
+            + (inputRowType.getFieldCount() - 1);
 
         // Check that the type is consistent with the referenced
         // field. If it is an object type, the rules are different, so

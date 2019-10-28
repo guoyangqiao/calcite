@@ -16,7 +16,10 @@
  */
 package org.apache.calcite.rex;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.calcite.rel.type.RelDataType;
+
+import java.util.stream.Collectors;
 
 /**
  * Shuttle which creates a deep copy of a Rex expression.
@@ -93,6 +96,11 @@ class RexCopier extends RexShuttle {
   public RexNode visitRangeRef(RexRangeRef rangeRef) {
     return builder.makeRangeReference(copy(rangeRef.getType()),
         rangeRef.getOffset(), false);
+  }
+
+  public RexNode visitList(RexList list) {
+    final ImmutableList<RexNode> rexNodes = ImmutableList.copyOf(list.elements.stream().map(e -> e.accept(this)).collect(Collectors.toList()));
+    return RexList.of(rexNodes);
   }
 }
 
