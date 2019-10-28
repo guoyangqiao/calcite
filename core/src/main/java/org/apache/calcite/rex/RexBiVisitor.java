@@ -52,7 +52,7 @@ public interface RexBiVisitor<R, P> {
 
   R visitPatternFieldRef(RexPatternFieldRef ref, P arg);
 
-  R visitList(RexList ref, P arg);
+  R visitList(RexList list, P arg);
 }
 
 // End RexBiVisitor.java
