@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.rex;
 
+import com.google.common.collect.*;
 import org.apache.calcite.avatica.util.TimeUnit;
 import org.apache.calcite.avatica.util.TimeUnitRange;
 import org.apache.calcite.plan.RelOptPredicateList;
@@ -33,29 +34,9 @@ import org.apache.calcite.util.Bug;
 import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Util;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.BoundType;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Range;
-import com.google.common.collect.Sets;
+import java.util.*;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-
-import static org.apache.calcite.rex.RexUnknownAs.FALSE;
-import static org.apache.calcite.rex.RexUnknownAs.TRUE;
-import static org.apache.calcite.rex.RexUnknownAs.UNKNOWN;
+import static org.apache.calcite.rex.RexUnknownAs.*;
 
 /**
  * Context required to simplify a row-expression.
@@ -1114,6 +1095,11 @@ public class RexSimplify {
       return false;
     }
 
+    @Override
+    public Boolean visitList(RexList list) {
+      return true;
+    }
+
   }
 
   /** Analyzes a given {@link RexNode} and decides whenever it is safe to
@@ -1922,7 +1908,7 @@ public class RexSimplify {
     if (p == null) {
       rangeTerms.put(ref,
           Pair.of(range(comparison, v0),
-              (List<RexNode>) ImmutableList.of(term)));
+              ImmutableList.of(term)));
     } else {
       // Exists
       boolean removeUpperBound = false;
@@ -1937,7 +1923,7 @@ public class RexSimplify {
         }
         rangeTerms.put(ref,
             Pair.of(Range.singleton(v0),
-                (List<RexNode>) ImmutableList.of(term)));
+                ImmutableList.of(term)));
         // remove
         for (RexNode e : p.right) {
           replaceLast(terms, e, trueLiteral);
@@ -2095,7 +2081,7 @@ public class RexSimplify {
         }
         newBounds.add(term);
         rangeTerms.put(ref,
-            Pair.of(r, (List<RexNode>) newBounds.build()));
+            Pair.of(r, newBounds.build()));
       } else if (removeLowerBound) {
         ImmutableList.Builder<RexNode> newBounds = ImmutableList.builder();
         for (RexNode e : p.right) {
@@ -2107,7 +2093,7 @@ public class RexSimplify {
         }
         newBounds.add(term);
         rangeTerms.put(ref,
-            Pair.of(r, (List<RexNode>) newBounds.build()));
+            Pair.of(r, newBounds.build()));
       }
     }
     // Default

@@ -16,14 +16,13 @@
  */
 package org.apache.calcite.rex;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.calcite.avatica.util.DateTimeUtils;
 import org.apache.calcite.avatica.util.TimeUnit;
 import org.apache.calcite.avatica.util.TimeUnitRange;
 import org.apache.calcite.rel.metadata.NullSentinel;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Util;
-
-import com.google.common.collect.ImmutableMap;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -121,6 +120,11 @@ public class RexInterpreter implements RexVisitor<Comparable> {
 
   public Comparable visitPatternFieldRef(RexPatternFieldRef fieldRef) {
     throw unbound(fieldRef);
+  }
+
+  @Override
+  public Comparable visitList(RexList list) {
+    throw unbound(list);
   }
 
   public Comparable visitCall(RexCall call) {

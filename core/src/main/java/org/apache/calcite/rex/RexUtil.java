@@ -16,6 +16,10 @@
  */
 package org.apache.calcite.rex;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import org.apache.calcite.linq4j.function.Predicate1;
 import org.apache.calcite.plan.RelOptPredicateList;
 import org.apache.calcite.plan.RelOptUtil;
@@ -45,23 +49,9 @@ import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Util;
 import org.apache.calcite.util.mapping.Mappings;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.function.Predicate;
 import javax.annotation.Nonnull;
+import java.util.*;
+import java.util.function.Predicate;
 
 /**
  * Utility methods concerning row-expressions.
@@ -175,10 +165,8 @@ public class RexUtil {
     if (allowCast) {
       if (node.isA(SqlKind.CAST)) {
         RexCall call = (RexCall) node;
-        if (isNullLiteral(call.operands.get(0), false)) {
-          // node is "CAST(NULL as type)"
-          return true;
-        }
+        // node is "CAST(NULL as type)"
+        return isNullLiteral(call.operands.get(0), false);
       }
     }
     return false;
@@ -225,10 +213,8 @@ public class RexUtil {
     if (allowCast) {
       if (node.isA(SqlKind.CAST)) {
         RexCall call = (RexCall) node;
-        if (isLiteral(call.operands.get(0), false)) {
-          // node is "CAST(literal as type)"
-          return true;
-        }
+        // node is "CAST(literal as type)"
+        return isLiteral(call.operands.get(0), false);
       }
     }
     return false;
@@ -457,6 +443,11 @@ public class RexUtil {
    */
   static class ConstantFinder implements RexVisitor<Boolean> {
     static final ConstantFinder INSTANCE = new ConstantFinder();
+
+    @Override
+    public Boolean visitList(RexList list) {
+      return false;
+    }
 
     public Boolean visitLiteral(RexLiteral literal) {
       return true;

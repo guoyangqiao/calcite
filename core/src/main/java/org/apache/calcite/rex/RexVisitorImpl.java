@@ -110,6 +110,18 @@ public class RexVisitorImpl<R> implements RexVisitor<R> {
     return r;
   }
 
+  @Override
+  public R visitList(RexList list) {
+    if(!deep){
+      return null;
+    }
+    R r = null;
+    for (RexNode operand : list.elements) {
+      r = operand.accept(this);
+    }
+    return r;
+  }
+
   @Override public R visitTableInputRef(RexTableInputRef ref) {
     return null;
   }

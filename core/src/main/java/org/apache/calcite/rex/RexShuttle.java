@@ -227,6 +227,11 @@ public class RexShuttle implements RexVisitor<RexNode> {
     return rangeRef;
   }
 
+  @Override
+  public RexNode visitList(RexList list) {
+    return list;
+  }
+
   /**
    * Applies this shuttle to each expression in a list.
    *

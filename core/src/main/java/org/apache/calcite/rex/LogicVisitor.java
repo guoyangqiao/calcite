@@ -16,15 +16,10 @@
  */
 package org.apache.calcite.rex;
 
+import com.google.common.collect.Iterables;
 import org.apache.calcite.plan.RelOptUtil.Logic;
 
-import com.google.common.collect.Iterables;
-
-import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Visitor pattern for traversing a tree of {@link RexNode} objects.
@@ -161,6 +156,11 @@ public class LogicVisitor implements RexBiVisitor<Logic, Logic> {
       }
     }
     return end(subQuery, arg);
+  }
+
+  @Override
+  public Logic visitList(RexList ref, Logic arg) {
+    return end(ref,arg);
   }
 
   @Override public Logic visitTableInputRef(RexTableInputRef ref, Logic arg) {
