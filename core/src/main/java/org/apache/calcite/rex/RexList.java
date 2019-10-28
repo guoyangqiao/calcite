@@ -2,6 +2,7 @@ package org.apache.calcite.rex;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.ArraySqlType;
 
 import java.util.List;
@@ -32,6 +33,11 @@ public class RexList extends RexNode {
   @Override
   public RelDataType getType() {
     return new ArraySqlType(elements.get(0).getType(), false);
+  }
+
+  @Override
+  public SqlKind getKind() {
+    return SqlKind.ARRAY_VALUE_CONSTRUCTOR;
   }
 
   @Override
