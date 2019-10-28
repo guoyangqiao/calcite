@@ -6,14 +6,19 @@ import org.apache.calcite.sql.type.ArraySqlType;
 
 import java.util.List;
 
+/**
+ * A list of {@link RexNode}.
+ * Normally the type of all elements is {@link RexLiteral}
+ */
 public class RexList extends RexNode {
 
   public final List<RexNode> elements;
 
-  public static RexList of(RexNode... rexNodes){
+  public static RexList of(RexNode... rexNodes) {
     return of(ImmutableList.copyOf(rexNodes));
   }
-  public static RexList of(List<RexNode> rexNodes){
+
+  public static RexList of(List<RexNode> rexNodes) {
     return new RexList(ImmutableList.copyOf(rexNodes));
   }
 
