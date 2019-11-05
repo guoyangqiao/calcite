@@ -1051,7 +1051,7 @@ public abstract class SqlImplementor {
             final SqlNode selectItem = selectList.get(ordinal);
             switch (selectItem.getKind()) {
             case AS:
-              //Modified by GYQ on 2019-11-05 11:32:11, since generated sql will be parsed for a second time, will generate as origin as possible
+              //Modified by GYQ on 2019-11-05 11:32:11, since generated sql will be parsed for a second time, will generate as original as possible
               //Doesn't return 'AS' detail but just alias
               return ((SqlCall) selectItem).operand(1);
 //              return ((SqlCall) selectItem).operand(0);
