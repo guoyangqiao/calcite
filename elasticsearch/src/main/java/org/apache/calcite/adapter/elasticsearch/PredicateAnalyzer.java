@@ -1021,11 +1021,12 @@ class PredicateAnalyzer {
 
     @Override
     public QueryExpression range(List<Pair<LiteralExpression, LiteralExpression>> rangeList) {
-      QueryBuilders.multiRanges(getFieldReference(), rangeList.stream().map(range -> {
+      builder = QueryBuilders.multiRanges(getFieldReference(), rangeList.stream().map(range -> {
         final LiteralExpression left = range.left;
         final LiteralExpression right = range.right;
         return new Pair<>(left.value(), right.value());
       }).collect(Collectors.toList()));
+      return this;
     }
 
     @Override
