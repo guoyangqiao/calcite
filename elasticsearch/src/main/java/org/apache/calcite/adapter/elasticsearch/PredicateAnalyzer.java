@@ -46,6 +46,7 @@ import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.Pair;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -411,8 +412,8 @@ class PredicateAnalyzer {
             case CAST:
             case LIKE:
             case OTHER_FUNCTION:
-              return true;
             case CASE:
+              return true;
             case SIMILAR:
             default:
               return false;
@@ -460,6 +461,8 @@ class PredicateAnalyzer {
               return toCastExpression(call);
             case LIKE:
               return binary(call);
+            case CASE:
+              return caze(call);
             default:
               // manually process ITEM($0, 'foo') which in our case will be named attribute
               if (call.getOperator().getName().equalsIgnoreCase("ITEM")) {
@@ -485,6 +488,16 @@ class PredicateAnalyzer {
               syntax, call);
           throw new PredicateAnalyzerException(message);
       }
+    }
+
+    /**
+     * Implement CASE [WHEN THEN...] ELSE END in {@link org.apache.calcite.rel.logical.LogicalProject},
+     *
+     * @param call RexCall
+     */
+    private QueryExpression caze(RexCall call) {
+      assert SqlStdOperatorTable.CASE.equals(call.getOperator());
+      return null;
     }
 
     private static String convertQueryString(List<Expression> fields, Expression query) {
@@ -778,6 +791,14 @@ class PredicateAnalyzer {
     public abstract QueryExpression hasChild(LiteralExpression name, QueryExpression accept);
 
     /**
+     * similar case when
+     *
+     * @param rangeList
+     * @return
+     */
+    public abstract QueryExpression range(List<Pair<LiteralExpression, LiteralExpression>> rangeList);
+
+    /**
      * Negate {@code this} QueryExpression (not the next one).
      */
     public abstract QueryExpression not();
@@ -839,7 +860,7 @@ class PredicateAnalyzer {
     /**
      * if partial expression, we will need to complete it with a full filter
      *
-     * @param partial     whether we partially converted a and for push down purposes.
+     * @param partial     whether we partially converted and for push down purposes.
      * @param expressions list of expressions to join with {@code and} boolean
      * @return new instance of expression
      */
@@ -869,6 +890,12 @@ class PredicateAnalyzer {
 
     @Override
     public QueryExpression hasChild(LiteralExpression rexLiteral, QueryExpression accept) {
+      throw new PredicateAnalyzerException("Query semantic ['hasChild'] "
+          + "cannot be applied to a compound expression");
+    }
+
+    @Override
+    public QueryExpression range(List<Pair<LiteralExpression, LiteralExpression>> rangeList) {
       throw new PredicateAnalyzerException("Query semantic ['hasChild'] "
           + "cannot be applied to a compound expression");
     }
@@ -990,6 +1017,15 @@ class PredicateAnalyzer {
       assert builder == null;
       builder = QueryBuilders.hasChild(literalExpression.stringValue(), QueryBuilders.constantScoreQuery(childQuery.builder()));
       return this;
+    }
+
+    @Override
+    public QueryExpression range(List<Pair<LiteralExpression, LiteralExpression>> rangeList) {
+      QueryBuilders.multiRanges(getFieldReference(), rangeList.stream().map(range -> {
+        final LiteralExpression left = range.left;
+        final LiteralExpression right = range.right;
+        return new Pair<>(left.value(), right.value());
+      }).collect(Collectors.toList()));
     }
 
     @Override

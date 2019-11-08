@@ -17,6 +17,7 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+import org.apache.calcite.util.Pair;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -208,6 +209,16 @@ class QueryBuilders {
    */
   static HasChildQueryBuilder hasChild(String childType) {
     return new HasChildQueryBuilder(childType, QueryBuilders.matchAll());
+  }
+
+  /**
+   * A case when semantic which so far used in Range Aggregation
+   *
+   * @param rangeField Field will be applied
+   * @param ranges     Pairs of numbers, use <code>Object</code> for future changes
+   */
+  public static MultiRangesQueryBuilder multiRanges(String rangeField, List<Pair<Object, Object>> ranges) {
+    return new MultiRangesQueryBuilder(rangeField, ranges);
   }
 
   /**
@@ -613,6 +624,48 @@ class QueryBuilders {
       generator.writeFieldName("min_children");
       generator.writeNumber(0);
       generator.writeEndObject();
+      generator.writeEndObject();
+    }
+  }
+
+  /**
+   * <code>range</code> block defined in https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-range-aggregation.html
+   */
+  static class MultiRangesQueryBuilder extends QueryBuilder {
+    private String field;
+    private List<Pair<Object, Object>> ranges;
+
+    private MultiRangesQueryBuilder(String field, List<Pair<Object, Object>> ranges) {
+      this.field = field;
+      this.ranges = ranges;
+    }
+
+    @Override
+    void writeJson(JsonGenerator generator) throws IOException {
+      generator.writeStartObject();
+      generator.writeFieldName("range");
+      generator.writeString(field);
+      generator.writeFieldName("ranges");
+      generator.writeStartArray();
+      ranges.stream().filter(x -> x.left != null || x.right != null).forEach(range -> {
+        try {
+          generator.writeStartObject();
+          final Object left = range.left;
+          if (left != null) {
+            generator.writeFieldName("from");
+            generator.writeObject(left);
+          }
+          final Object right = range.right;
+          if (right != null) {
+            generator.writeFieldName("to");
+            generator.writeObject(right);
+          }
+          generator.writeEndObject();
+        } catch (Throwable t) {
+          throw new RuntimeException(t);
+        }
+      });
+      generator.writeEndArray();
       generator.writeEndObject();
     }
   }

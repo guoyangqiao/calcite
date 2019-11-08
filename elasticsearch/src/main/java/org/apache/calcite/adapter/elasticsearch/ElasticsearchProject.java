@@ -17,10 +17,7 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import org.apache.calcite.adapter.java.JavaTypeFactory;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -60,7 +57,7 @@ public class ElasticsearchProject extends Project implements ElasticsearchRel {
             ElasticsearchRules.elasticsearchFieldNames(getInput().getRowType());
     final ElasticsearchRules.RexToElasticsearchTranslator translator =
             new ElasticsearchRules.RexToElasticsearchTranslator(
-                    (JavaTypeFactory) getCluster().getTypeFactory(), inFields);
+                (JavaTypeFactory) getCluster().getTypeFactory(), inFields, RelOptUtil.findAllTables(this), implementor.elasticsearchTable.mapper);
 
     final List<String> fields = new ArrayList<>();
     final List<String> scriptFields = new ArrayList<>();
