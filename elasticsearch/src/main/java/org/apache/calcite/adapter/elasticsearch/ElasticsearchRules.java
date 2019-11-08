@@ -154,7 +154,7 @@ class ElasticsearchRules {
       this.typeFactory = typeFactory;
       this.inFields = inFields;
       this.allTables = tables;
-      this.mapper=mapper;
+      this.mapper = mapper;
     }
 
     @Override
@@ -179,7 +179,27 @@ class ElasticsearchRules {
       if (name != null) {
         return name;
       }
-
+      if (call.getKind() == SqlKind.CASE) {
+        final QueryBuilders.QueryBuilder rexBuilder;
+        try {
+          rexBuilder = PredicateAnalyzer.analyze(call, allTables);
+        } catch (Throwable e) {
+          throw new IllegalArgumentException("Translation of " + call
+              + " is not supported by ElasticsearchProject", e);
+        }
+        assert rexBuilder != null;
+        try {
+          StringWriter writer = new StringWriter();
+          JsonGenerator generator = mapper.getFactory().createGenerator(writer);
+          rexBuilder.writeJson(generator);
+          generator.flush();
+          generator.close();
+          final String rexJson = writer.toString();
+          return rexJson;
+        } catch (Throwable ignored) {
+          //will fall to IllegalArgumentException
+        }
+      }
       final List<String> strings = visitList(call.operands);
 
       if (call.getKind() == SqlKind.CAST) {
@@ -191,26 +211,6 @@ class ElasticsearchRules {
         final SqlTypeName sqlTypeName = op1.getType().getSqlTypeName();
         if (op1 instanceof RexLiteral && (sqlTypeName == SqlTypeName.INTEGER || sqlTypeName == SqlTypeName.CHAR)) {
           return stripQuotes(strings.get(0)) + "[" + ((RexLiteral) op1).getValue2() + "]";
-        }
-      }
-      final QueryBuilders.QueryBuilder rexBuilder;
-      try {
-        rexBuilder = PredicateAnalyzer.analyze(call, allTables);
-      } catch (Throwable e) {
-        throw new IllegalArgumentException("Translation of " + call
-            + " is not supported by ElasticsearchProject", e);
-      }
-      if (rexBuilder != null) {
-        try {
-          StringWriter writer = new StringWriter();
-          JsonGenerator generator = mapper.getFactory().createGenerator(writer);
-          rexBuilder.writeJson(generator);
-          generator.flush();
-          generator.close();
-          final String rexJson = writer.toString();
-          return rexJson;
-        } catch (Throwable ignored) {
-          //will fall to IllegalArgumentException
         }
       }
       throw new IllegalArgumentException("Translation of " + call
