@@ -640,11 +640,40 @@ class QueryBuilders {
       this.ranges = ranges;
     }
 
+    /**
+     * {
+     *     "range":{
+     *         "field":"price",
+     *         "keyed":true,
+     *         "ranges":[
+     *             {
+     *                 "key":"cheap",
+     *                 "to":100
+     *             },
+     *             {
+     *                 "key":"average",
+     *                 "from":100,
+     *                 "to":200
+     *             },
+     *             {
+     *                 "key":"expensive",
+     *                 "from":200
+     *             }
+     *         ]
+     *     }
+     * }
+     * @param generator used to generate JSON elements
+     * @throws IOException
+     */
     @Override
     void writeJson(JsonGenerator generator) throws IOException {
       generator.writeStartObject();
       generator.writeFieldName("range");
+      generator.writeStartObject();
+      generator.writeFieldName("field");
       generator.writeString(field);
+      generator.writeFieldName("keyed");
+      generator.writeObject(true);
       generator.writeFieldName("ranges");
       generator.writeStartArray();
       ranges.stream().filter(x -> x.left != null || x.right != null).forEach(range -> {
@@ -666,6 +695,7 @@ class QueryBuilders {
         }
       });
       generator.writeEndArray();
+      generator.writeEndObject();
       generator.writeEndObject();
     }
   }
