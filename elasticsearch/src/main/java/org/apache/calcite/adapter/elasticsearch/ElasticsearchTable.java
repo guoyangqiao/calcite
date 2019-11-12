@@ -16,12 +16,13 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.ImmutableMap;
 import org.apache.calcite.adapter.java.AbstractQueryableTable;
-import org.apache.calcite.linq4j.Enumerable;
-import org.apache.calcite.linq4j.Enumerator;
-import org.apache.calcite.linq4j.Linq4j;
-import org.apache.calcite.linq4j.QueryProvider;
-import org.apache.calcite.linq4j.Queryable;
+import org.apache.calcite.linq4j.*;
 import org.apache.calcite.linq4j.function.Function1;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
@@ -33,27 +34,12 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.TranslatableTable;
 import org.apache.calcite.schema.impl.AbstractTableQueryable;
 import org.apache.calcite.sql.type.SqlTypeName;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.ImmutableMap;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -214,10 +200,17 @@ public class ElasticsearchTable extends AbstractQueryableTable implements Transl
       final ObjectNode terms = section.with("terms");
       terms.put("field", name);
 
-      transport.mapping.missingValueFor(name).ifPresent(m -> {
-        // expose missing terms. each type has a different missing value
-        terms.set("missing", m);
-      });
+      try {
+        transport.mapping.missingValueFor(name).ifPresent(m -> {
+          // expose missing terms. each type has a different missing value
+          terms.set("missing", m);
+        });
+      } catch (IllegalArgumentException t) {
+            //try to infer group by key
+
+      } catch (Throwable t) {
+          throw t;
+      }
 
       if (fetch != null) {
         terms.put("size", fetch);

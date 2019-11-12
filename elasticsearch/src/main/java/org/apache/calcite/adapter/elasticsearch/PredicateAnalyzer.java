@@ -498,7 +498,7 @@ class PredicateAnalyzer {
      */
     private QueryExpression caze(RexCall call) {
       assert SqlStdOperatorTable.CASE.equals(call.getOperator());
-      final RexInputRef fieldLiteral = rangeSemanticCheck(call);
+      final RexCall fieldLiteral = rangeSemanticCheck(call);
       final List<RexNode> operands = call.getOperands();
       //Shuttle will discard what doesn't need
       class FromAndToShuttle extends RexShuttle {
@@ -530,26 +530,32 @@ class PredicateAnalyzer {
       final List<Pair<Pair<LiteralExpression, LiteralExpression>, LiteralExpression>> rangeList = new ArrayList<>();
       for (int i = 0; i < operands.size() / 2; i++) {
         final FromAndToShuttle fromAndToShuttle = new FromAndToShuttle();
-        final RexNode ranges = operands.get(i);
+        final RexNode ranges = operands.get(2 * i);
         ranges.accept(fromAndToShuttle);
-        final RexNode key = operands.get(i + 1);
+        final RexNode key = operands.get(2 * i + 1);
         assert key instanceof RexLiteral;
-        rangeList.add(Pair.of(Pair.of((LiteralExpression) visitLiteral(fromAndToShuttle.from), (LiteralExpression) visitLiteral(fromAndToShuttle.to)), (LiteralExpression) visitLiteral((RexLiteral) key)));
+        rangeList.add(
+            Pair.of(
+                Pair.of(
+                    fromAndToShuttle.from != null ? (LiteralExpression) visitLiteral(fromAndToShuttle.from) : null,
+                    fromAndToShuttle.to != null ? (LiteralExpression) visitLiteral(fromAndToShuttle.to) : null
+                ),
+                (LiteralExpression) visitLiteral((RexLiteral) key)));
       }
-      return QueryExpression.create((NamedFieldExpression) visitInputRef(fieldLiteral)).range(rangeList);
+      return QueryExpression.create((NamedFieldExpression) visitCall(fieldLiteral)).range(rangeList);
     }
 
     /**
      * Check if CASE call match the restrictions of es ranges
      */
-    private RexInputRef rangeSemanticCheck(RexCall call) {
-      final Map<Integer, RexNode> rexInputRefs = new HashMap<>();
+    private RexCall rangeSemanticCheck(RexCall call) {
+      final Map<Integer, RexCall> rexInputRefs = new HashMap<>();
       final RexVisitorImpl<Void> sameInputVisitor = new RexVisitorImpl<Void>(true) {
         @Override
         public Void visitCall(RexCall call) {
           if (call.getOperator().equals(SqlStdOperatorTable.ITEM)) {
             final RexInputRef inputRef = ((RexInputRef) call.getOperands().get(0));
-            rexInputRefs.put(inputRef.getIndex(), call.getOperands().get(0));
+            rexInputRefs.put(inputRef.getIndex(), call);
           }
           return super.visitCall(call);
         }
@@ -558,7 +564,7 @@ class PredicateAnalyzer {
       if (rexInputRefs.size() > 1) {
         throw new IllegalArgumentException("Unexpected arguments of CASE, should use only one input ref but got " + rexInputRefs.size());
       }
-      return (RexInputRef) rexInputRefs.values().toArray()[0];
+      return (RexCall) rexInputRefs.values().toArray()[0];
     }
 
     private static String convertQueryString(List<Expression> fields, Expression query) {
@@ -1080,7 +1086,7 @@ class PredicateAnalyzer {
         final Pair<LiteralExpression, LiteralExpression> ranges = rangeBlock.left;
         final LiteralExpression left = ranges.left;
         final LiteralExpression right = ranges.right;
-        return Pair.of(Pair.of(left.value(), right.value()), rangeBlock.right.stringValue());
+        return Pair.of(Pair.of(left != null ? left.value() : null, right != null ? right.value() : null), rangeBlock.right.value());
       }).collect(Collectors.toList()));
       return this;
     }

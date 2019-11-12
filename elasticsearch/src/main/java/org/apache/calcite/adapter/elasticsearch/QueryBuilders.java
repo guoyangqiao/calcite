@@ -217,7 +217,7 @@ class QueryBuilders {
    * @param rangeField Field will be applied
    * @param ranges     Pairs of numbers, use <code>Object</code> for future changes
    */
-  public static MultiRangesQueryBuilder multiRanges(String rangeField, List<Pair<Pair<Object, Object>, String>> ranges) {
+  public static MultiRangesQueryBuilder multiRanges(String rangeField, List<Pair<Pair<Object, Object>, Object>> ranges) {
     return new MultiRangesQueryBuilder(rangeField, ranges);
   }
 
@@ -633,13 +633,13 @@ class QueryBuilders {
    */
   static class MultiRangesQueryBuilder extends QueryBuilder {
     private String fieldName;
-    private List<Pair<Pair<Object, Object>, String>> ranges;
+    private List<Pair<Pair<Object, Object>, Object>> ranges;
 
     /**
      * @param fieldName Which will be ranged
      * @param ranges    Triple's elements are <code>from</code>, <code>key</code>, <code>to</code>
      */
-    private MultiRangesQueryBuilder(String fieldName, List<Pair<Pair<Object, Object>, String>> ranges) {
+    private MultiRangesQueryBuilder(String fieldName, List<Pair<Pair<Object, Object>, Object>> ranges) {
       this.fieldName = fieldName;
       this.ranges = ranges;
     }
@@ -698,7 +698,7 @@ class QueryBuilders {
             generator.writeObject(right);
           }
           generator.writeFieldName("key");
-          generator.writeString(rangeBlock.right);
+          generator.writeString(String.valueOf(rangeBlock.right));
           generator.writeEndObject();
         } catch (Throwable t) {
           throw new RuntimeException(t);
