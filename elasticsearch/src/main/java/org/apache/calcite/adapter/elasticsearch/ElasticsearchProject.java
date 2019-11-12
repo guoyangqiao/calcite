@@ -85,6 +85,8 @@ public class ElasticsearchProject extends Project implements ElasticsearchRel {
                 // _source (ES2) vs params._source (ES5)
                 + "\"" + implementor.elasticsearchTable.scriptedFieldPrefix() + "."
                 + expr.replaceAll("\"", "") + "\"}");
+        //For some aggregation generation, this should be added to the mapping as an es field, experimental
+        implementor.elasticsearchTable.transport.mapping.mapping().put(name, null);
       }
     }
 
