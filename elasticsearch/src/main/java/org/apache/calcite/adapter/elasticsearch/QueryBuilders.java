@@ -17,7 +17,7 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import com.fasterxml.jackson.core.JsonGenerator;
-import org.apache.calcite.util.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -217,7 +217,7 @@ class QueryBuilders {
    * @param rangeField Field will be applied
    * @param ranges     Pairs of numbers, use <code>Object</code> for future changes
    */
-  public static MultiRangesQueryBuilder multiRanges(String rangeField, List<Pair<Object, Object>> ranges) {
+  public static MultiRangesQueryBuilder multiRanges(String rangeField, List<Triple<Object, String, Object>> ranges) {
     return new MultiRangesQueryBuilder(rangeField, ranges);
   }
 
@@ -632,11 +632,15 @@ class QueryBuilders {
    * <code>range</code> block defined in https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-range-aggregation.html
    */
   static class MultiRangesQueryBuilder extends QueryBuilder {
-    private String field;
-    private List<Pair<Object, Object>> ranges;
+    private String fieldName;
+    private List<Triple<Object, String, Object>> ranges;
 
-    private MultiRangesQueryBuilder(String field, List<Pair<Object, Object>> ranges) {
-      this.field = field;
+    /**
+     * @param fieldName Which will be ranged
+     * @param ranges    Triple's elements are <code>from</code>, <code>key</code>, <code>to</code>
+     */
+    private MultiRangesQueryBuilder(String fieldName, List<Triple<Object, String, Object>> ranges) {
+      this.fieldName = fieldName;
       this.ranges = ranges;
     }
 
@@ -671,24 +675,26 @@ class QueryBuilders {
       generator.writeFieldName("range");
       generator.writeStartObject();
       generator.writeFieldName("field");
-      generator.writeString(field);
+      generator.writeString(fieldName);
       generator.writeFieldName("keyed");
       generator.writeObject(true);
       generator.writeFieldName("ranges");
       generator.writeStartArray();
-      ranges.stream().filter(x -> x.left != null || x.right != null).forEach(range -> {
+      ranges.stream().filter(x -> x.getLeft() != null || x.getRight() != null).forEach(range -> {
         try {
           generator.writeStartObject();
-          final Object left = range.left;
+          final Object left = range.getLeft();
           if (left != null) {
             generator.writeFieldName("from");
             generator.writeObject(left);
           }
-          final Object right = range.right;
+          final Object right = range.getRight();
           if (right != null) {
             generator.writeFieldName("to");
             generator.writeObject(right);
           }
+          generator.writeFieldName("key");
+          generator.writeString(range.getMiddle());
           generator.writeEndObject();
         } catch (Throwable t) {
           throw new RuntimeException(t);

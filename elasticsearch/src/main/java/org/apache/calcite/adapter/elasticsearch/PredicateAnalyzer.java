@@ -19,6 +19,7 @@ package org.apache.calcite.adapter.elasticsearch;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.BoolQueryBuilder;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.QueryBuilder;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.RangeQueryBuilder;
@@ -46,7 +47,8 @@ import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.calcite.util.Pair;
+import org.apache.commons.lang3.tuple.ImmutableTriple;
+import org.apache.commons.lang3.tuple.Triple;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -497,7 +499,67 @@ class PredicateAnalyzer {
      */
     private QueryExpression caze(RexCall call) {
       assert SqlStdOperatorTable.CASE.equals(call.getOperator());
-      return null;
+      final RexLiteral fieldLiteral = rangeSemanticCheck(call);
+      final List<RexNode> operands = call.getOperands();
+      //Shuttle will discard what doesn't need
+      class FromAndToShuttle extends RexShuttle {
+
+        private RexLiteral from;
+        private RexLiteral to;
+        private final Set<SqlKind> validOperator = ImmutableSet.of(SqlKind.GREATER_THAN_OR_EQUAL, SqlKind.LESS_THAN);
+
+        @Override
+        public RexNode visitCall(RexCall call) {
+          final SqlOperator operator = call.getOperator();
+          if (validOperator.contains(operator.getKind())) {
+            for (RexNode operand : call.getOperands()) {
+              if (operand instanceof RexLiteral) {
+                switch (operator.getKind()) {
+                  case LESS_THAN:
+                    to = (RexLiteral) operand;
+                    break;
+                  case GREATER_THAN_OR_EQUAL:
+                    from = (RexLiteral) operand;
+                    break;
+                }
+              }
+            }
+          }
+          return super.visitCall(call);
+        }
+      }
+      final List<Triple<LiteralExpression, LiteralExpression, LiteralExpression>> rangeList = new ArrayList<>();
+      for (int i = 0; i < operands.size(); i += 2) {
+        final FromAndToShuttle fromAndToShuttle = new FromAndToShuttle();
+        final RexNode ranges = operands.get(i);
+        ranges.accept(fromAndToShuttle);
+        final RexNode key = operands.get(i + 1);
+        assert key instanceof RexLiteral;
+        rangeList.add(ImmutableTriple.of((LiteralExpression) visitLiteral(fromAndToShuttle.from), (LiteralExpression) visitLiteral((RexLiteral) key), (LiteralExpression) visitLiteral(fromAndToShuttle.to)));
+      }
+      return QueryExpression.create(new LiteralExpression(fieldLiteral)).range(rangeList);
+    }
+
+    /**
+     * Check if CASE call match the restrictions of es ranges
+     */
+    private RexLiteral rangeSemanticCheck(RexCall call) {
+      final Map<Integer, RexNode> rexInputRefs = new HashMap<>();
+      final RexVisitorImpl<Void> sameInputVisitor = new RexVisitorImpl<Void>(true) {
+        @Override
+        public Void visitCall(RexCall call) {
+          if (call.getOperator().equals(SqlStdOperatorTable.ITEM)) {
+            final RexInputRef inputRef = ((RexInputRef) call.getOperands().get(0));
+            rexInputRefs.put(inputRef.getIndex(), call.getOperands().get(1));
+          }
+          return super.visitCall(call);
+        }
+      };
+      call.accept(sameInputVisitor);
+      if (rexInputRefs.size() > 1) {
+        throw new IllegalArgumentException("Unexpected arguments of CASE, should use only one input ref but got " + rexInputRefs.size());
+      }
+      return (RexLiteral) rexInputRefs.values().toArray()[0];
     }
 
     private static String convertQueryString(List<Expression> fields, Expression query) {
@@ -796,7 +858,7 @@ class PredicateAnalyzer {
      * @param rangeList
      * @return
      */
-    public abstract QueryExpression range(List<Pair<LiteralExpression, LiteralExpression>> rangeList);
+    public abstract QueryExpression range(List<Triple<LiteralExpression, LiteralExpression, LiteralExpression>> rangeList);
 
     /**
      * Negate {@code this} QueryExpression (not the next one).
@@ -895,7 +957,7 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression range(List<Pair<LiteralExpression, LiteralExpression>> rangeList) {
+    public QueryExpression range(List<Triple<LiteralExpression, LiteralExpression, LiteralExpression>> rangeList) {
       throw new PredicateAnalyzerException("Query semantic ['hasChild'] "
           + "cannot be applied to a compound expression");
     }
@@ -1020,11 +1082,11 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression range(List<Pair<LiteralExpression, LiteralExpression>> rangeList) {
+    public QueryExpression range(List<Triple<LiteralExpression, LiteralExpression, LiteralExpression>> rangeList) {
       builder = QueryBuilders.multiRanges(getFieldReference(), rangeList.stream().map(range -> {
-        final LiteralExpression left = range.left;
-        final LiteralExpression right = range.right;
-        return new Pair<>(left.value(), right.value());
+        final LiteralExpression left = range.getLeft();
+        final LiteralExpression right = range.getRight();
+        return ImmutableTriple.of(left.value(), range.getMiddle().stringValue(), right.value());
       }).collect(Collectors.toList()));
       return this;
     }
