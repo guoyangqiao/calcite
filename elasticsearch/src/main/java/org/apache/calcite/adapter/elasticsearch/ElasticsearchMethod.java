@@ -16,9 +16,8 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
-import org.apache.calcite.linq4j.tree.Types;
-
 import com.google.common.collect.ImmutableMap;
+import org.apache.calcite.linq4j.tree.Types;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -37,6 +36,7 @@ enum ElasticsearchMethod {
       List.class, // groupBy
       List.class, // aggregations
       Map.class, // item to expression mapping. Eg. _MAP['a.b.c'] and EXPR$1
+      Map.class, // item to projection mapping. Eg. case when then AS EXPR$1
       Long.class, // offset
       Long.class); // fetch
 

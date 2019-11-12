@@ -103,11 +103,12 @@ public class ElasticsearchTable extends AbstractQueryableTable implements Transl
       List<String> groupBy,
       List<Map.Entry<String, String>> aggregations,
       Map<String, String> mappings,
+      Map<String, String> projectItemMappings,
       Long offset, Long fetch) throws IOException {
 
     if (!aggregations.isEmpty() || !groupBy.isEmpty()) {
       // process aggregations separately
-      return aggregate(ops, fields, sort, groupBy, aggregations, mappings, offset, fetch);
+      return aggregate(ops, fields, sort, groupBy, aggregations, mappings, projectItemMappings, offset, fetch);
     }
 
     final ObjectNode query = mapper.createObjectNode();
@@ -153,6 +154,7 @@ public class ElasticsearchTable extends AbstractQueryableTable implements Transl
       List<String> groupBy,
       List<Map.Entry<String, String>> aggregations,
       Map<String, String> mapping,
+      Map<String, String> projectItemMappings,
       Long offset, Long fetch) throws IOException {
 
     if (!groupBy.isEmpty() && offset != null) {
@@ -195,25 +197,31 @@ public class ElasticsearchTable extends AbstractQueryableTable implements Transl
     for (String name: orderedGroupBy) {
       final String aggName = "g_" + name;
       fieldMap.put(aggName, name);
-
       final ObjectNode section = parent.with(aggName);
-      final ObjectNode terms = section.with("terms");
-      terms.put("field", name);
+      String projectionItem;
+      //Added by GYQ, the projection may generate new field, so will it be used in aggregation
+      if ((projectionItem = projectItemMappings.get(name)) != null) {
+        final JsonNode projectNode = mapper.readTree(projectionItem);
+        assert  projectNode instanceof  ObjectNode;
+        section.setAll((ObjectNode) projectNode);
+      } else {
+        final ObjectNode terms = section.with("terms");
+        terms.put("field", name);
 
-      transport.mapping.missingValueFor(name).ifPresent(m -> {
-        // expose missing terms. each type has a different missing value
-        terms.set("missing", m);
-      });
+        transport.mapping.missingValueFor(name).ifPresent(m -> {
+          // expose missing terms. each type has a different missing value
+          terms.set("missing", m);
+        });
 
-      if (fetch != null) {
-        terms.put("size", fetch);
+        if (fetch != null) {
+          terms.put("size", fetch);
+        }
+
+        sort.stream().filter(e -> e.getKey().equals(name)).findAny()
+            .ifPresent(s ->
+                terms.with("order")
+                    .put("_key", s.getValue().isDescending() ? "desc" : "asc"));
       }
-
-      sort.stream().filter(e -> e.getKey().equals(name)).findAny()
-          .ifPresent(s ->
-              terms.with("order")
-                  .put("_key", s.getValue().isDescending() ? "desc" : "asc"));
-
       parent = section.with(AGGREGATIONS);
     }
 
@@ -347,9 +355,10 @@ public class ElasticsearchTable extends AbstractQueryableTable implements Transl
          List<String> groupBy,
          List<Map.Entry<String, String>> aggregations,
          Map<String, String> mappings,
+         Map<String, String> projectItemMappings,
          Long offset, Long fetch) {
       try {
-        return getTable().find(ops, fields, sort, groupBy, aggregations, mappings, offset, fetch);
+        return getTable().find(ops, fields, sort, groupBy, aggregations, mappings, projectItemMappings, offset, fetch);
       } catch (IOException e) {
         throw new UncheckedIOException("Failed to query " + getTable().indexName, e);
       }
