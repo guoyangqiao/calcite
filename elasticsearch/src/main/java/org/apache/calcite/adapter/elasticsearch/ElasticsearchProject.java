@@ -80,8 +80,9 @@ public class ElasticsearchProject extends Project implements ElasticsearchRel {
                 + ":{\"script\": "
                 + expr.split(":")[1] + "}");
       } else if (ElasticsearchRules.isCase(pair.left)) {
-          //ignore
-        implementor.projectItemMap.put(name,expr);
+        //TODO If the query is not a aggregation, the case should fall into script_field which was currently not implemented
+        //More information see https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-body.html#request-body-search-script-fields
+        implementor.projectItemMap.put(name, expr);
       } else {
         scriptFields.add(ElasticsearchRules.quote(name)
             + ":{\"script\":"
