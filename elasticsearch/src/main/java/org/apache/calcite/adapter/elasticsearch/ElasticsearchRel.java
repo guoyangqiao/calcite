@@ -23,11 +23,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.util.Pair;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Relational expression that uses Elasticsearch calling convention.
@@ -74,6 +70,11 @@ public interface ElasticsearchRel extends RelNode {
      * @see SqlStdOperatorTable#ITEM
      */
     final Map<String, String> expressionItemMap = new LinkedHashMap<>();
+
+    /**
+     * Like {@link Implementor#expressionItemMap}, this field store projection field.
+     */
+    final Map<String, String> projectItemMap = new LinkedHashMap<>();
 
     /**
      * Starting index (default {@code 0}). Equivalent to {@code start} in ES query.

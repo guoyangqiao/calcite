@@ -79,14 +79,15 @@ public class ElasticsearchProject extends Project implements ElasticsearchRel {
         scriptFields.add(ElasticsearchRules.quote(name)
                 + ":{\"script\": "
                 + expr.split(":")[1] + "}");
+      } else if (ElasticsearchRules.isCase(pair.left)) {
+          //ignore
+        implementor.projectItemMap.put(name,expr);
       } else {
         scriptFields.add(ElasticsearchRules.quote(name)
-                + ":{\"script\":"
-                // _source (ES2) vs params._source (ES5)
-                + "\"" + implementor.elasticsearchTable.scriptedFieldPrefix() + "."
-                + expr.replaceAll("\"", "") + "\"}");
-        //For some aggregation generation, this should be added to the mapping as an es field, experimental
-        implementor.elasticsearchTable.transport.mapping.mapping().put(name, null);
+            + ":{\"script\":"
+            // _source (ES2) vs params._source (ES5)
+            + "\"" + implementor.elasticsearchTable.scriptedFieldPrefix() + "."
+            + expr.replaceAll("\"", "") + "\"}");
       }
     }
 

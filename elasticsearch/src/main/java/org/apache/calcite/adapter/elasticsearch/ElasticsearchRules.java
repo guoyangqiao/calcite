@@ -101,6 +101,16 @@ class ElasticsearchRules {
     return Boolean.TRUE.equals(result);
   }
 
+  static boolean isCase(RexNode node) {
+    final Boolean result = node.accept(new RexVisitorImpl<Boolean>(false) {
+      @Override
+      public Boolean visitCall(final RexCall call) {
+        return SqlKind.CASE == call.getOperator().getKind();
+      }
+    });
+    return Boolean.TRUE.equals(result);
+  }
+
   /**
    * Unwraps cast expressions from current call. {@code cast(cast(expr))} becomes {@code expr}.
    */
