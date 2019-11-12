@@ -528,7 +528,7 @@ class PredicateAnalyzer {
         }
       }
       final List<Pair<Pair<LiteralExpression, LiteralExpression>, LiteralExpression>> rangeList = new ArrayList<>();
-      for (int i = 0; i < operands.size() % 2; i += 1) {
+      for (int i = 0; i < operands.size() / 2; i++) {
         final FromAndToShuttle fromAndToShuttle = new FromAndToShuttle();
         final RexNode ranges = operands.get(i);
         ranges.accept(fromAndToShuttle);
