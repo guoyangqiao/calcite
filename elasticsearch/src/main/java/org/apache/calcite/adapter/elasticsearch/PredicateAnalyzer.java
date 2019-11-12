@@ -47,8 +47,7 @@ import org.apache.calcite.sql.fun.SqlInOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.commons.lang3.tuple.ImmutableTriple;
-import org.apache.commons.lang3.tuple.Triple;
+import org.apache.calcite.util.Pair;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -528,14 +527,14 @@ class PredicateAnalyzer {
           return super.visitCall(call);
         }
       }
-      final List<Triple<LiteralExpression, LiteralExpression, LiteralExpression>> rangeList = new ArrayList<>();
+      final List<Pair<Pair<LiteralExpression, LiteralExpression>, LiteralExpression>> rangeList = new ArrayList<>();
       for (int i = 0; i < operands.size(); i += 2) {
         final FromAndToShuttle fromAndToShuttle = new FromAndToShuttle();
         final RexNode ranges = operands.get(i);
         ranges.accept(fromAndToShuttle);
         final RexNode key = operands.get(i + 1);
         assert key instanceof RexLiteral;
-        rangeList.add(ImmutableTriple.of((LiteralExpression) visitLiteral(fromAndToShuttle.from), (LiteralExpression) visitLiteral((RexLiteral) key), (LiteralExpression) visitLiteral(fromAndToShuttle.to)));
+        rangeList.add(Pair.of(Pair.of((LiteralExpression) visitLiteral(fromAndToShuttle.from), (LiteralExpression) visitLiteral((RexLiteral) key)), (LiteralExpression) visitLiteral(fromAndToShuttle.to)));
       }
       return QueryExpression.create(new LiteralExpression(fieldLiteral)).range(rangeList);
     }
@@ -852,13 +851,7 @@ class PredicateAnalyzer {
 
     public abstract QueryExpression hasChild(LiteralExpression name, QueryExpression accept);
 
-    /**
-     * similar case when
-     *
-     * @param rangeList
-     * @return
-     */
-    public abstract QueryExpression range(List<Triple<LiteralExpression, LiteralExpression, LiteralExpression>> rangeList);
+    public abstract QueryExpression range(List<Pair<Pair<LiteralExpression, LiteralExpression>, LiteralExpression>> rangeList);
 
     /**
      * Negate {@code this} QueryExpression (not the next one).
@@ -957,7 +950,7 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression range(List<Triple<LiteralExpression, LiteralExpression, LiteralExpression>> rangeList) {
+    public QueryExpression range(List<Pair<Pair<LiteralExpression, LiteralExpression>, LiteralExpression>> rangeList) {
       throw new PredicateAnalyzerException("Query semantic ['hasChild'] "
           + "cannot be applied to a compound expression");
     }
@@ -1082,11 +1075,12 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression range(List<Triple<LiteralExpression, LiteralExpression, LiteralExpression>> rangeList) {
-      builder = QueryBuilders.multiRanges(getFieldReference(), rangeList.stream().map(range -> {
-        final LiteralExpression left = range.getLeft();
-        final LiteralExpression right = range.getRight();
-        return ImmutableTriple.of(left.value(), range.getMiddle().stringValue(), right.value());
+    public QueryExpression range(List<Pair<Pair<LiteralExpression, LiteralExpression>, LiteralExpression>> rangeList) {
+      builder = QueryBuilders.multiRanges(getFieldReference(), rangeList.stream().map(rangeBlock -> {
+        final Pair<LiteralExpression, LiteralExpression> ranges = rangeBlock.left;
+        final LiteralExpression left = ranges.left;
+        final LiteralExpression right = ranges.right;
+        return Pair.of(Pair.of(left.value(), right.value()), rangeBlock.right.stringValue());
       }).collect(Collectors.toList()));
       return this;
     }
