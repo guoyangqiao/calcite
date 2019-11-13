@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -112,7 +113,7 @@ class PredicateAnalyzer {
     Objects.requireNonNull(expression, "expression");
     try {
       // visits expression tree
-      QueryExpression e = (QueryExpression) expression.accept(new Visitor(context));
+      QueryExpression e = (QueryExpression) expression.accept(new Visitor(context, expression));
 
       if (e != null && e.isPartial()) {
         throw new UnsupportedOperationException("Can't handle partial QueryExpression: " + e);
@@ -154,43 +155,97 @@ class PredicateAnalyzer {
    * Traverses {@link RexNode} tree and builds ES query.
    */
   private static class Visitor extends RexVisitorImpl<Expression> {
-    final String ITEM_FUNC = "ITEM";
-    final String CAST_FUNC = "CAST";
-    final String PARENT_FIELD = "PARENT";
-    final String NAME_FIELD = "NAME";
-    final String JOIN_TYPE = "JOIN";
-    final String ID = "ID";
+    static final String ITEM_FUNC = "ITEM";
+    static final String CAST_FUNC = "CAST";
+    static final String PARENT_FIELD = "PARENT";
+    static final String NAME_FIELD = "NAME";
+    static final String JOIN_TYPE = "JOIN";
+    static final String ID = "ID";
+    static final String TYPE_KEY = "type";
+    static final String RELATIONS_KEY = "relations";
     private final List<RelOptTable> relOptTables;
+    private final RexNode filterCondition;
 
-    private Visitor(List<RelOptTable> relOptTables) {
+    /**
+     * @param relOptTables    Tables the visitor rely on
+     * @param filterCondition {@link Filter#getCondition()}
+     */
+    private Visitor(List<RelOptTable> relOptTables, RexNode filterCondition) {
       super(true);
       this.relOptTables = relOptTables;
+      this.filterCondition = filterCondition;
     }
 
-    /*
-      {
-          "query": {
-              "has_child" : {
-                  "type" : "child",
-                  "query" : {
-                      "match_all" : {}
-                  },
-                  "max_children": 10,
-                  "min_children": 2,
-                  "score_mode" : "min"
-              }
-          }
+    public Expression visitSubQuery(RexSubQuery subQuery) {
+      Expression hasChild = predicateHasChild(subQuery);
+      if (hasChild != null) {
+        return hasChild;
       }
+      Expression childrenAggregation = predicateChildrenAggregation(subQuery);
+      if (childrenAggregation != null) {
+        return childrenAggregation;
+      }
+      return super.visitSubQuery(subQuery);
+    }
+
+    /**
+     * Predicate if a subquery could be part of children aggregation
+     *
+     * @param subQuery
+     * @return True if matched, otherwise null
      */
+    private Expression predicateChildrenAggregation(RexSubQuery subQuery) {
+      final RexNode inField = subQuery.operands.get(0);
+      if (subQuery.op instanceof SqlInOperator) {
+        if (inField.isA(SqlKind.FIELD_ACCESS)) {
+          final RexFieldAccess fieldAccess = (RexFieldAccess) inField;
+          final RelDataTypeField field = fieldAccess.getField();
+          final RexNode referenceExpr = fieldAccess.getReferenceExpr();
+          if (PARENT_FIELD.equalsIgnoreCase(field.getName())) {
+            if (referenceExpr instanceof RexCall && SqlKind.CAST == ((RexCall) referenceExpr).getOperator().getKind()) {
+              final RexNode castOp1 = ((RexCall) referenceExpr).getOperands().get(0);
+              if (((RexCall) castOp1).getOperator().isName(ITEM_FUNC, false)) {
+                final List<RexNode> operands = ((RexCall) castOp1).getOperands();
+                final RexLiteral literalRef = (RexLiteral) operands.get(1);
+                final String fieldName = literalRef.getValueAs(String.class);
+                if (relOptTables.size() == 1) {
+                  final ElasticsearchMapping mapping = relOptTables.get(0).unwrap(ElasticsearchTable.class).transport.mapping;
+                  final Map<String, ElasticsearchMapping.Datatype> fieldMapping = mapping.mapping();
+                  final ElasticsearchMapping.Datatype datatype = fieldMapping.get(fieldName);
+                  if (datatype != null) {
+                    final JsonNode properties = datatype.properties();
+                    if (JOIN_TYPE.equalsIgnoreCase(properties.get(TYPE_KEY).asText())) {
+                      final RelNode subQueryNode = RelCopyShuttle.copyOf(subQuery.rel);
+                      if (subQueryNode.getRowType().getFieldList().size() == 1) {
+                        RelNode probeProject;
+                        for (probeProject = subQueryNode; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
+                          //ignore
+                        }
+                        if (probeProject instanceof Project) {
+                          final List<RelDataTypeField> fieldList = probeProject.getRowType().getFieldList();
+                          if (fieldList.size() == 1) {
+
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+        }
+      }
+      return null;
+    }
+
 
     /**
      * convert subquery to has child.
      * TODO will fail if the eq'e right hand was inputRef
-     *
-     * @param subQuery
-     * @return
      */
-    public Expression visitSubQuery(RexSubQuery subQuery) {
+    private Expression predicateHasChild(RexSubQuery subQuery) {
       final AtomicBoolean projectionTest = new AtomicBoolean(false);
       final AtomicBoolean filterTest = new AtomicBoolean(false);
       final RexNode rexNode = subQuery.operands.get(0);
@@ -244,7 +299,63 @@ class PredicateAnalyzer {
           }
         }
       }
-      return super.visitSubQuery(subQuery);
+      return null;
+    }
+
+    /**
+     * To find whether a rexnode contains join type equation, such as customer_child.name = 'parent'
+     */
+    private static class JoinTypeFinderShuttle extends RexShuttle {
+      private final ElasticsearchMapping elasticsearchMapping;
+      private final RelNode topNode;
+      String joinType = null;
+      Boolean parent = null;
+
+      private JoinTypeFinderShuttle(ElasticsearchMapping elasticsearchMapping, RelNode topNode) {
+        this.elasticsearchMapping = elasticsearchMapping;
+        this.topNode = topNode;
+      }
+
+      @Override
+      public RexNode visitCall(RexCall call) {
+        final SqlOperator operator = call.getOperator();
+        if (operator.getKind() == SqlKind.EQUALS) {
+          final RexNode rexNode = call.getOperands().get(1);
+          if (rexNode instanceof RexLiteral) {
+            final RexNode inputRef = call.getOperands().get(0);
+            if (inputRef instanceof RexInputRef) {
+              final int index = ((RexInputRef) inputRef).getIndex();
+              final boolean derivedName = testJoinFieldAccess(index, NAME_FIELD, topNode, elasticsearchMapping);
+              if (derivedName) {
+                final String typeName = ((RexLiteral) rexNode).getValueAs(String.class);
+                finish:
+                for (Map.Entry<String, ElasticsearchMapping.Datatype> x : elasticsearchMapping.mapping().entrySet()) {
+                  if (JOIN_TYPE.equalsIgnoreCase(x.getValue().properties().get(TYPE_KEY).asText())) {
+                    //Code below will be triggered once, cause one index can have at most one join type
+                    final Map.Entry<String, JsonNode> relations = x.getValue().properties().get(RELATIONS_KEY).fields().next();
+                    final String key = relations.getKey();
+                    if (typeName.equalsIgnoreCase(key)) {
+                      joinType = key;
+                      parent = true;
+                    } else {
+                      for (JsonNode jsonNode : relations.getValue()) {
+                        final String childType = jsonNode.asText();
+                        //This mean we just support 2 layer join
+                        if (typeName.equalsIgnoreCase(childType)) {
+                          joinType = childType;
+                          parent = false;
+                          break finish;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        return super.visitCall(call);
+      }
     }
 
     /**
@@ -299,7 +410,8 @@ class PredicateAnalyzer {
       return nameHolder.get();
     }
 
-    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping mapping, AtomicReference<RexLiteral> nameHolder, RelNode finalProbeFilter) {
+    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping
+        mapping, AtomicReference<RexLiteral> nameHolder, RelNode finalProbeFilter) {
       return new RexShuttle() {
         @Override
         public RexNode visitCall(RexCall call) {
@@ -311,7 +423,7 @@ class PredicateAnalyzer {
             final RexNode rexNode = call.getOperands().get(1);
             if (ref instanceof RexInputRef) {
               final int index = ((RexInputRef) ref).getIndex();
-              if (testFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping)) {
+              if (testJoinFieldAccess(index, NAME_FIELD, finalProbeFilter, mapping)) {
                 filterTest.set(true);
                 nameHolder.set(((RexLiteral) rexNode));
                 return finalProbeFilter.getCluster().getRexBuilder().makeLiteral(true);//mute this condition in es grammar builder
@@ -327,7 +439,7 @@ class PredicateAnalyzer {
       probeProject.accept(new RexShuttle() {
         @Override
         public RexNode visitInputRef(RexInputRef inputRef) {
-          projectionTest.set(testFieldAccess(inputRef.getIndex(), PARENT_FIELD, probeProject, mapping));
+          projectionTest.set(testJoinFieldAccess(inputRef.getIndex(), PARENT_FIELD, probeProject, mapping));
           return inputRef;
         }
       });
@@ -342,7 +454,7 @@ class PredicateAnalyzer {
      * @param mapping     ES mapping
      * @return
      */
-    private boolean testFieldAccess(int index, String targetField, RelNode rootNode, ElasticsearchMapping mapping) {
+    private static boolean testJoinFieldAccess(int index, String targetField, RelNode rootNode, ElasticsearchMapping mapping) {
       for (RelNode input = rootNode.getInput(0); input.getInputs().size() != 0; input = input.getInput(0)) {
         if (input instanceof Project) {
           final RexNode rexNode = ((Project) input).getProjects().get(index);
