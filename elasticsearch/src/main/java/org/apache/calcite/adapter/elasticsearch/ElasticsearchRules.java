@@ -204,10 +204,9 @@ class ElasticsearchRules {
           rexBuilder.writeJson(generator);
           generator.flush();
           generator.close();
-          final String rexJson = writer.toString();
-          return rexJson;
+          return writer.toString();
         } catch (Throwable ignored) {
-          //will fall to IllegalArgumentException
+          throwIllegalException(call);
         }
       }
       final List<String> strings = visitList(call.operands);
@@ -223,6 +222,10 @@ class ElasticsearchRules {
           return stripQuotes(strings.get(0)) + "[" + ((RexLiteral) op1).getValue2() + "]";
         }
       }
+      return throwIllegalException(call);
+    }
+
+    private String throwIllegalException(RexCall call) {
       throw new IllegalArgumentException("Translation of " + call
           + " is not supported by ElasticsearchProject");
     }
