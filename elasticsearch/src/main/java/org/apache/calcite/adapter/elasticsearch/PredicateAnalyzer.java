@@ -228,6 +228,7 @@ class PredicateAnalyzer {
                                     throw new RuntimeException(e);
                                   }
                                 } else {
+                                  expression.builder = QueryBuilders.matchAll();
                                 }
                               });
                             }
