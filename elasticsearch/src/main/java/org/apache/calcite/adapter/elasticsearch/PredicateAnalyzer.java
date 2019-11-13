@@ -219,7 +219,7 @@ class PredicateAnalyzer {
                             final RelDataTypeField project = fieldList.get(0);
                             final String name = project.getName();
                             if (ID.equalsIgnoreCase(name)) {
-                              new PromisedHasChildQueryExpression(null).promised((expression) -> {
+                              return new PromisedQueryExpression().ifPromised((expression) -> {
                                 final Filter filter = firstClassInstance(Filter.class, subQueryNode);
                                 if (filter != null) {
                                   try {
@@ -1041,7 +1041,7 @@ class PredicateAnalyzer {
 
   }
 
-  static class PromisedHasChildQueryExpression extends SimpleQueryExpression {
+  static class PromisedQueryExpression extends SimpleQueryExpression {
 
     private boolean promised;
     private Consumer<SimpleQueryExpression> queryExpressionSupplier;
@@ -1050,22 +1050,17 @@ class PredicateAnalyzer {
       this.promised = promised;
     }
 
-    private PromisedHasChildQueryExpression(NamedFieldExpression rel) {
-      super(rel);
+    private PromisedQueryExpression() {
+      super(null);
     }
 
     @Override
-    public QueryExpression hasChild(LiteralExpression literalExpression, QueryExpression childQuery) {
-      if (promised) {
-        assert queryExpressionSupplier != null;
-        queryExpressionSupplier.accept(this);
-      } else {
-        super.hasChild(literalExpression, childQuery);
-      }
-      return this;
+    public QueryExpression equals(LiteralExpression literal) {
+
+      return super.equals(literal);
     }
 
-    public QueryExpression promised(Consumer<SimpleQueryExpression> expressionSupplier) {
+    public QueryExpression ifPromised(Consumer<SimpleQueryExpression> expressionSupplier) {
       this.queryExpressionSupplier = expressionSupplier;
       return this;
     }
