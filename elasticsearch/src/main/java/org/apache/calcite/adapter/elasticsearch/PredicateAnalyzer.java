@@ -26,10 +26,7 @@ import org.apache.calcite.adapter.elasticsearch.QueryBuilders.QueryBuilder;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.RangeQueryBuilder;
 import org.apache.calcite.adapter.enumerable.EnumerableConvention;
 import org.apache.calcite.adapter.enumerable.EnumerableRel;
-import org.apache.calcite.plan.ConventionTraitDef;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptTable;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
@@ -53,6 +50,7 @@ import org.apache.calcite.util.Pair;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -104,8 +102,8 @@ class PredicateAnalyzer {
    * <p>Callers should catch ExpressionNotAnalyzableException
    * and fall back to not using push-down filters.
    *
-   * @param expression expression to analyze
-   * @param context    context which passed from parent rel
+   * @param filter  expression belong
+   * @param context context which passed from parent rel
    * @return search query which can be used to query ES cluster
    * @throws ExpressionNotAnalyzableException when expression can't processed by this analyzer
    */
@@ -113,7 +111,7 @@ class PredicateAnalyzer {
     Objects.requireNonNull(expression, "expression");
     try {
       // visits expression tree
-      QueryExpression e = (QueryExpression) expression.accept(new Visitor(context, expression));
+      QueryExpression e = (QueryExpression) expression.accept(new Visitor(context));
 
       if (e != null && e.isPartial()) {
         throw new UnsupportedOperationException("Can't handle partial QueryExpression: " + e);
@@ -164,16 +162,13 @@ class PredicateAnalyzer {
     static final String TYPE_KEY = "type";
     static final String RELATIONS_KEY = "relations";
     private final List<RelOptTable> relOptTables;
-    private final RexNode filterCondition;
 
     /**
-     * @param relOptTables    Tables the visitor rely on
-     * @param filterCondition {@link Filter#getCondition()}
+     * @param relOptTables Tables the visitor rely on
      */
-    private Visitor(List<RelOptTable> relOptTables, RexNode filterCondition) {
+    private Visitor(List<RelOptTable> relOptTables) {
       super(true);
       this.relOptTables = relOptTables;
-      this.filterCondition = filterCondition;
     }
 
     public Expression visitSubQuery(RexSubQuery subQuery) {
@@ -217,14 +212,25 @@ class PredicateAnalyzer {
                     if (JOIN_TYPE.equalsIgnoreCase(properties.get(TYPE_KEY).asText())) {
                       final RelNode subQueryNode = RelCopyShuttle.copyOf(subQuery.rel);
                       if (subQueryNode.getRowType().getFieldList().size() == 1) {
-                        RelNode probeProject;
-                        for (probeProject = subQueryNode; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
-                          //ignore
-                        }
-                        if (probeProject instanceof Project) {
+                        final Project probeProject = firstClassInstance(Project.class, subQueryNode);
+                        if (probeProject != null) {
                           final List<RelDataTypeField> fieldList = probeProject.getRowType().getFieldList();
                           if (fieldList.size() == 1) {
-
+                            final RelDataTypeField project = fieldList.get(0);
+                            final String name = project.getName();
+                            if (ID.equalsIgnoreCase(name)) {
+                              new PromisedHasChildQueryExpression(null).promised((expression) -> {
+                                final Filter filter = firstClassInstance(Filter.class, subQueryNode);
+                                if (filter != null) {
+                                  try {
+                                    expression.builder = PredicateAnalyzer.analyze(filter.getCondition(), RelOptUtil.findAllTables(filter));
+                                  } catch (ExpressionNotAnalyzableException e) {
+                                    throw new RuntimeException(e);
+                                  }
+                                } else {
+                                }
+                              });
+                            }
                           }
                         }
                       }
@@ -240,6 +246,21 @@ class PredicateAnalyzer {
       return null;
     }
 
+    /**
+     * Find first object that is a sub-class of given class type.
+     * Note that it only handle case with one input which means all nodes are {@link  org.apache.calcite.rel.SingleRel}
+     *
+     * @param sample target class type
+     * @param start  top node
+     * @return null if not found
+     */
+    private static <T> T firstClassInstance(Class<T> sample, RelNode start) {
+      RelNode probeProject;
+      for (probeProject = start; probeProject.getInputs().size() != 0 && sample.isAssignableFrom(probeProject.getClass()); probeProject = probeProject.getInput(0)) {
+        //ignore
+      }
+      return (T) (sample.isAssignableFrom(probeProject.getClass()) ? probeProject : null);
+    }
 
     /**
      * convert subquery to has child.
@@ -967,7 +988,12 @@ class PredicateAnalyzer {
       return false;
     }
 
-    public abstract QueryExpression hasChild(LiteralExpression name, QueryExpression accept);
+    /**
+     * @param name  join type
+     * @param query query
+     * @return
+     */
+    public abstract QueryExpression hasChild(LiteralExpression name, QueryExpression query);
 
     public abstract QueryExpression range(List<Pair<Pair<LiteralExpression, LiteralExpression>, LiteralExpression>> rangeList);
 
@@ -1012,6 +1038,36 @@ class PredicateAnalyzer {
       }
     }
 
+  }
+
+  static class PromisedHasChildQueryExpression extends SimpleQueryExpression {
+
+    private boolean promised;
+    private Consumer<SimpleQueryExpression> queryExpressionSupplier;
+
+    public void setPromised(boolean promised) {
+      this.promised = promised;
+    }
+
+    private PromisedHasChildQueryExpression(NamedFieldExpression rel) {
+      super(rel);
+    }
+
+    @Override
+    public QueryExpression hasChild(LiteralExpression literalExpression, QueryExpression childQuery) {
+      if (promised) {
+        assert queryExpressionSupplier != null;
+        queryExpressionSupplier.accept(this);
+      } else {
+        super.hasChild(literalExpression, childQuery);
+      }
+      return this;
+    }
+
+    public QueryExpression promised(Consumer<SimpleQueryExpression> expressionSupplier) {
+      this.queryExpressionSupplier = expressionSupplier;
+      return this;
+    }
   }
 
   /**
@@ -1166,8 +1222,8 @@ class PredicateAnalyzer {
    */
   static class SimpleQueryExpression extends QueryExpression {
 
-    private final NamedFieldExpression rel;
-    private QueryBuilder builder;
+    protected final NamedFieldExpression rel;
+    protected QueryBuilder builder;
 
     private String getFieldReference() {
       return rel.getReference();
