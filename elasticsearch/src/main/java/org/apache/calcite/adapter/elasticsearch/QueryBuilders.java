@@ -644,7 +644,7 @@ class QueryBuilders {
       this.ranges = ranges;
     }
 
-    /**
+    /*
      * {
      *     "range":{
      *         "field":"price",
@@ -666,8 +666,10 @@ class QueryBuilders {
      *         ]
      *     }
      * }
+     */
+
+    /**
      * @param generator used to generate JSON elements
-     * @throws IOException
      */
     @Override
     void writeJson(JsonGenerator generator) throws IOException {
