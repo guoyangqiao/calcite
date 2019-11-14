@@ -2,7 +2,6 @@ package org.apache.calcite.adapter.elasticsearch;
 
 import com.google.common.collect.Sets;
 
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -25,10 +24,6 @@ public enum AnalyzePredication {
     public AnalyzePredicationCondition(AnalyzePredication predication) {
       this.predication = predication;
       this.conditions = new HashSet<>();
-    }
-
-    public boolean addAll(Collection<?> c) {
-      return conditions.addAll(c);
     }
 
     public boolean add(Object cdnObj) {

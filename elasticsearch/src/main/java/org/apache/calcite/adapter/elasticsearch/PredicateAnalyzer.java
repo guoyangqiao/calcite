@@ -242,7 +242,7 @@ class PredicateAnalyzer {
                               } else {
                                 queryBuilder = QueryBuilders.matchAll();
                               }
-                              return new PromisedQueryExpression().promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.RootIdSelection, queryBuilder).orElse(null);
+                              return new PromisedQueryExpression(predicationConditionMap).promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.RootIdSelection, queryBuilder).orElse(null);
                             }
                           }
                         }
@@ -805,8 +805,12 @@ class PredicateAnalyzer {
         case LIKE:
           return QueryExpression.create(pair.getKey()).like(pair.getValue());
 //          throw new UnsupportedOperationException("LIKE not yet supported");
-        case EQUALS:
-          return QueryExpression.create(pair.getKey()).equals(pair.getValue());
+        case EQUALS: {
+          //TODO test if equation is join field equation
+          return new PromisedQueryExpression(predicationConditionMap).
+              promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.childTypeJoinEquation, QueryBuilders.voidQuery()).
+              orElse(QueryExpression.create(pair.getKey()).equals(pair.getValue()).builder());
+        }
         case NOT_EQUALS:
           return QueryExpression.create(pair.getKey()).notEquals(pair.getValue());
         case GREATER_THAN:
@@ -1060,35 +1064,21 @@ class PredicateAnalyzer {
   static class PromisedQueryExpression extends SimpleQueryExpression {
 
     private QueryBuilder orElse;
-    private EnumMap<AnalyzePredication, QueryBuilder> ifPromised;
-    private EnumMap<AnalyzePredication, Set<Object>> promisedStatus = new EnumMap<>(AnalyzePredication.class);
-    private EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap;
+    private final EnumMap<AnalyzePredication, QueryBuilder> ifPromised;
+    private final EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap;
 
-    private PromisedQueryExpression() {
+
+    public PromisedQueryExpression(EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap) {
       super(null);
       this.ifPromised = new EnumMap<>(AnalyzePredication.class);
-    }
-
-    public PromisedQueryExpression predicationConditionMap(EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap) {
       this.predicationConditionMap = predicationConditionMap;
-      copyStatus();
-      return this;
     }
 
-    private void copyStatus() {
-      promisedStatus.forEach((k, v) -> {
-        AnalyzePredication.AnalyzePredicationCondition analyzePredicationCondition = predicationConditionMap.get(k);
-        if (analyzePredicationCondition != null) {
-          analyzePredicationCondition.addAll(v);
-        }
-      });
-    }
-
-    public PromisedQueryExpression promised(AnalyzePredication predication, Object conditionVal, QueryBuilder ifPromised) {
-      this.ifPromised.put(predication, ifPromised);
-      this.promisedStatus.computeIfAbsent(predication, c -> new HashSet<>()).add(conditionVal);
-      if (predicationConditionMap != null) {
-        copyStatus();
+    public PromisedQueryExpression promised(AnalyzePredication predication, Object conditionVal, QueryBuilder queryBuilder) {
+      ifPromised.put(predication, queryBuilder);
+      AnalyzePredication.AnalyzePredicationCondition analyzePredicationCondition = predicationConditionMap.get(predication);
+      if (analyzePredicationCondition != null) {
+        analyzePredicationCondition.add(conditionVal);
       }
       return this;
     }
@@ -1344,9 +1334,7 @@ class PredicateAnalyzer {
             .must(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).gte(value)))
             .must(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).lte(value)));
       } else {
-        return new PromisedQueryExpression().
-            promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.childTypeJoinEquation, QueryBuilders.voidQuery()).
-            orElse(QueryBuilders.termQuery(getFieldReference(), value));
+        builder = QueryBuilders.termQuery(getFieldReference(), value);
       }
       return this;
     }
