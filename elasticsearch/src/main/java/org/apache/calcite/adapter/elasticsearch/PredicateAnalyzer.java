@@ -257,7 +257,7 @@ class PredicateAnalyzer {
      */
     private static <T> T firstClassInstance(Class<T> sample, RelNode start) {
       RelNode probeProject;
-      for (probeProject = start; probeProject.getInputs().size() != 0 && sample.isAssignableFrom(probeProject.getClass()); probeProject = probeProject.getInput(0)) {
+      for (probeProject = start; probeProject.getInputs().size() != 0 && !sample.isAssignableFrom(probeProject.getClass()); probeProject = probeProject.getInput(0)) {
         //ignore
       }
       return (T) (sample.isAssignableFrom(probeProject.getClass()) ? probeProject : null);
@@ -325,7 +325,7 @@ class PredicateAnalyzer {
     }
 
     /**
-     * To find whether a rexnode contains join type equation, such as customer_child.name = 'parent'
+     * To find whether a rex node contains join type equation, such as customer_child.name = 'parent'
      */
     private static class JoinTypeFinderShuttle extends RexShuttle {
       private final ElasticsearchMapping elasticsearchMapping;
@@ -1043,25 +1043,31 @@ class PredicateAnalyzer {
 
   static class PromisedQueryExpression extends SimpleQueryExpression {
 
-    private boolean promised;
-    private Consumer<SimpleQueryExpression> queryExpressionSupplier;
-
-    public void setPromised(boolean promised) {
-      this.promised = promised;
-    }
+    private Consumer<SimpleQueryExpression> orElse;
+    private Consumer<SimpleQueryExpression> ifPromised;
 
     private PromisedQueryExpression() {
       super(null);
     }
 
-    @Override
-    public QueryExpression equals(LiteralExpression literal) {
-
-      return super.equals(literal);
+    public QueryExpression promised() {
+      this.ifPromised.accept(this);
+      return this;
     }
 
-    public QueryExpression ifPromised(Consumer<SimpleQueryExpression> expressionSupplier) {
-      this.queryExpressionSupplier = expressionSupplier;
+    public QueryExpression orElse() {
+      this.orElse.accept(this);
+      return this;
+    }
+
+
+    public PromisedQueryExpression ifPromised(Consumer<SimpleQueryExpression> ifPromised) {
+      this.ifPromised = ifPromised;
+      return this;
+    }
+
+    public PromisedQueryExpression orElse(Consumer<SimpleQueryExpression> orElse) {
+      this.orElse = orElse;
       return this;
     }
   }
@@ -1298,7 +1304,9 @@ class PredicateAnalyzer {
             .must(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).gte(value)))
             .must(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).lte(value)));
       } else {
-        builder = QueryBuilders.termQuery(getFieldReference(), value);
+        new PromisedQueryExpression().
+            ifPromised(x -> builder = QueryBuilders.voidQuery()).
+            orElse(x -> builder = QueryBuilders.termQuery(getFieldReference(), value));
       }
       return this;
     }

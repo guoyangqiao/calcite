@@ -221,6 +221,10 @@ class QueryBuilders {
     return new MultiRangesQueryBuilder(rangeField, ranges);
   }
 
+  public static QueryBuilder voidQuery() {
+    return new VoidQueryBuilder();
+  }
+
   /**
    * Base class to build ES queries
    */
@@ -233,6 +237,17 @@ class QueryBuilders {
      * @throws IOException if IO error occurred
      */
     abstract void writeJson(JsonGenerator generator) throws IOException;
+  }
+
+  /**
+   * Use this if doesn't want to implement a query
+   */
+  static class VoidQueryBuilder extends QueryBuilder {
+
+    @Override
+    void writeJson(JsonGenerator generator) throws IOException {
+
+    }
   }
 
   /**
