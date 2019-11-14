@@ -219,7 +219,7 @@ class PredicateAnalyzer {
                             final RelDataTypeField project = fieldList.get(0);
                             final String name = project.getName();
                             if (ID.equalsIgnoreCase(name)) {
-                              return new PromisedQueryExpression().ifPromised((expression) -> {
+                              return new PromisedQueryExpression().ifPromised(AnalyzePredication.CHILDREN_AGGREGATION, (expression) -> {
                                 final Filter filter = firstClassInstance(Filter.class, subQueryNode);
                                 if (filter != null) {
                                   try {
@@ -255,7 +255,7 @@ class PredicateAnalyzer {
      * @param start  top node
      * @return null if not found
      */
-    private static <T> T firstClassInstance(Class<T> sample, RelNode start) {
+    static <T> T firstClassInstance(Class<T> sample, RelNode start) {
       RelNode probeProject;
       for (probeProject = start; probeProject.getInputs().size() != 0 && !sample.isAssignableFrom(probeProject.getClass()); probeProject = probeProject.getInput(0)) {
         //ignore
@@ -327,7 +327,7 @@ class PredicateAnalyzer {
     /**
      * To find whether a rex node contains join type equation, such as customer_child.name = 'parent'
      */
-    private static class JoinTypeFinderShuttle extends RexShuttle {
+    static class JoinTypeFinderShuttle extends RexShuttle {
       private final ElasticsearchMapping elasticsearchMapping;
       private final RelNode topNode;
       String joinType = null;
@@ -1044,14 +1044,20 @@ class PredicateAnalyzer {
   static class PromisedQueryExpression extends SimpleQueryExpression {
 
     private Consumer<SimpleQueryExpression> orElse;
-    private Consumer<SimpleQueryExpression> ifPromised;
+    private EnumMap<AnalyzePredication, Consumer<SimpleQueryExpression>> ifPromised;
 
     private PromisedQueryExpression() {
       super(null);
+      this.ifPromised = new EnumMap<>(AnalyzePredication.class);
     }
 
-    public QueryExpression promised() {
-      this.ifPromised.accept(this);
+    public QueryExpression promised(AnalyzePredication analyzePredication) {
+      final Consumer<SimpleQueryExpression> expressionConsumer = this.ifPromised.get(analyzePredication);
+      if (expressionConsumer != null) {
+        expressionConsumer.accept(this);
+      } else {
+        orElse();
+      }
       return this;
     }
 
@@ -1061,8 +1067,8 @@ class PredicateAnalyzer {
     }
 
 
-    public PromisedQueryExpression ifPromised(Consumer<SimpleQueryExpression> ifPromised) {
-      this.ifPromised = ifPromised;
+    public PromisedQueryExpression ifPromised(AnalyzePredication predication, Consumer<SimpleQueryExpression> ifPromised) {
+      this.ifPromised.put(predication, ifPromised);
       return this;
     }
 
@@ -1304,8 +1310,8 @@ class PredicateAnalyzer {
             .must(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).gte(value)))
             .must(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).lte(value)));
       } else {
-        new PromisedQueryExpression().
-            ifPromised(x -> builder = QueryBuilders.voidQuery()).
+        return new PromisedQueryExpression().
+            ifPromised(AnalyzePredication.CHILDREN_AGGREGATION, x -> builder = QueryBuilders.voidQuery()).
             orElse(x -> builder = QueryBuilders.termQuery(getFieldReference(), value));
       }
       return this;
