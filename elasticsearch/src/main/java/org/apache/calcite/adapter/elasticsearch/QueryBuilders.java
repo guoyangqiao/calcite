@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Utility class to generate elastic search queries. Most query builders have
@@ -223,6 +224,19 @@ class QueryBuilders {
 
   public static QueryBuilder voidQuery() {
     return new VoidQueryBuilder();
+  }
+
+  static class DelayedQueryBuilder extends QueryBuilder {
+    private Supplier<QueryBuilder> queryBuilder;
+
+    DelayedQueryBuilder(Supplier<QueryBuilder> queryBuilder) {
+      this.queryBuilder = queryBuilder;
+    }
+
+    @Override
+    void writeJson(JsonGenerator generator) throws IOException {
+      queryBuilder.get().writeJson(generator);
+    }
   }
 
   /**

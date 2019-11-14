@@ -50,7 +50,6 @@ import org.apache.calcite.util.Pair;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -103,15 +102,18 @@ class PredicateAnalyzer {
    * and fall back to not using push-down filters.
    *
    * @param expression expression will be analyzed
-   * @param context    context which passed from parent rel
+   * @param tables     context which passed from parent rel
    * @return search query which can be used to query ES cluster
    * @throws ExpressionNotAnalyzableException when expression can't processed by this analyzer
    */
-  static QueryBuilder analyze(RexNode expression, List<RelOptTable> context) throws ExpressionNotAnalyzableException {
+  static QueryBuilder analyze(RexNode expression, List<RelOptTable> tables) throws ExpressionNotAnalyzableException {
     Objects.requireNonNull(expression, "expression");
+    final AnalyzePredication.AnalyzePredicationCondition childAggregationPredictor = new AnalyzePredication.AnalyzePredicationCondition(AnalyzePredication.CHILDREN_AGGREGATION);
+    AnalyzerContext analyzerContext = new AnalyzerContext(ImmutableList.copyOf(tables));
+    analyzerContext.predicationConditionMap.put(AnalyzePredication.CHILDREN_AGGREGATION, childAggregationPredictor);
     try {
       // visits expression tree
-      QueryExpression e = (QueryExpression) expression.accept(new Visitor(context));
+      QueryExpression e = (QueryExpression) expression.accept(new Visitor(analyzerContext));
 
       if (e != null && e.isPartial()) {
         throw new UnsupportedOperationException("Can't handle partial QueryExpression: " + e);
@@ -120,6 +122,15 @@ class PredicateAnalyzer {
     } catch (Throwable e) {
       Throwables.propagateIfPossible(e, UnsupportedOperationException.class);
       throw new ExpressionNotAnalyzableException("Can't convert " + expression, e);
+    }
+  }
+
+  private static class AnalyzerContext {
+    final EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap = new EnumMap<>(AnalyzePredication.class);
+    final ImmutableList<RelOptTable> tables;
+
+    public AnalyzerContext(ImmutableList<RelOptTable> tables) {
+      this.tables = tables;
     }
   }
 
@@ -161,14 +172,15 @@ class PredicateAnalyzer {
     static final String ID = "ID";
     static final String TYPE_KEY = "type";
     static final String RELATIONS_KEY = "relations";
-    private final List<RelOptTable> relOptTables;
+    private final AnalyzerContext analyzerContext;
+    private final ImmutableList<RelOptTable> relOptTables;
+    private final EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap;
 
-    /**
-     * @param relOptTables Tables the visitor rely on
-     */
-    private Visitor(List<RelOptTable> relOptTables) {
+    private Visitor(AnalyzerContext analyzerContext) {
       super(true);
-      this.relOptTables = relOptTables;
+      this.analyzerContext = analyzerContext;
+      this.relOptTables = analyzerContext.tables;
+      this.predicationConditionMap = analyzerContext.predicationConditionMap;
     }
 
     public Expression visitSubQuery(RexSubQuery subQuery) {
@@ -219,18 +231,18 @@ class PredicateAnalyzer {
                             final RelDataTypeField project = fieldList.get(0);
                             final String name = project.getName();
                             if (ID.equalsIgnoreCase(name)) {
-                              return new PromisedQueryExpression().ifPromised(AnalyzePredication.CHILDREN_AGGREGATION, (expression) -> {
-                                final Filter filter = firstClassInstance(Filter.class, subQueryNode);
-                                if (filter != null) {
-                                  try {
-                                    expression.builder = PredicateAnalyzer.analyze(filter.getCondition(), RelOptUtil.findAllTables(filter));
-                                  } catch (ExpressionNotAnalyzableException e) {
-                                    throw new RuntimeException(e);
-                                  }
-                                } else {
-                                  expression.builder = QueryBuilders.matchAll();
+                              QueryBuilder queryBuilder;
+                              final Filter filter = firstClassInstance(Filter.class, subQueryNode);
+                              if (filter != null) {
+                                try {
+                                  queryBuilder = PredicateAnalyzer.analyze(filter.getCondition(), RelOptUtil.findAllTables(filter));
+                                } catch (ExpressionNotAnalyzableException e) {
+                                  throw new RuntimeException(e);
                                 }
-                              });
+                              } else {
+                                queryBuilder = QueryBuilders.matchAll();
+                              }
+                              return new PromisedQueryExpression().promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.RootIdSelection, queryBuilder).orElse(null);
                             }
                           }
                         }
@@ -1041,40 +1053,62 @@ class PredicateAnalyzer {
 
   }
 
+  /**
+   * {@link SimpleQueryExpression} that hold conditioned {@link QueryBuilder}, when condition matches, related {@link QueryExpression} will be returned,
+   * otherwise default expression returned
+   */
   static class PromisedQueryExpression extends SimpleQueryExpression {
 
-    private Consumer<SimpleQueryExpression> orElse;
-    private EnumMap<AnalyzePredication, Consumer<SimpleQueryExpression>> ifPromised;
+    private QueryBuilder orElse;
+    private EnumMap<AnalyzePredication, QueryBuilder> ifPromised;
+    private EnumMap<AnalyzePredication, Set<Object>> promisedStatus = new EnumMap<>(AnalyzePredication.class);
+    private EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap;
 
     private PromisedQueryExpression() {
       super(null);
       this.ifPromised = new EnumMap<>(AnalyzePredication.class);
     }
 
-    public QueryExpression promised(AnalyzePredication analyzePredication) {
-      final Consumer<SimpleQueryExpression> expressionConsumer = this.ifPromised.get(analyzePredication);
-      if (expressionConsumer != null) {
-        expressionConsumer.accept(this);
-      } else {
-        orElse();
+    public PromisedQueryExpression predicationConditionMap(EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap) {
+      this.predicationConditionMap = predicationConditionMap;
+      copyStatus();
+      return this;
+    }
+
+    private void copyStatus() {
+      promisedStatus.forEach((k, v) -> {
+        AnalyzePredication.AnalyzePredicationCondition analyzePredicationCondition = predicationConditionMap.get(k);
+        if (analyzePredicationCondition != null) {
+          analyzePredicationCondition.addAll(v);
+        }
+      });
+    }
+
+    public PromisedQueryExpression promised(AnalyzePredication predication, Object conditionVal, QueryBuilder ifPromised) {
+      this.ifPromised.put(predication, ifPromised);
+      this.promisedStatus.computeIfAbsent(predication, c -> new HashSet<>()).add(conditionVal);
+      if (predicationConditionMap != null) {
+        copyStatus();
       }
       return this;
     }
 
-    public QueryExpression orElse() {
-      this.orElse.accept(this);
-      return this;
-    }
-
-
-    public PromisedQueryExpression ifPromised(AnalyzePredication predication, Consumer<SimpleQueryExpression> ifPromised) {
-      this.ifPromised.put(predication, ifPromised);
-      return this;
-    }
-
-    public PromisedQueryExpression orElse(Consumer<SimpleQueryExpression> orElse) {
+    public PromisedQueryExpression orElse(QueryBuilder orElse) {
       this.orElse = orElse;
       return this;
+    }
+
+    @Override
+    public QueryBuilder builder() {
+      return new QueryBuilders.DelayedQueryBuilder(() -> {
+        for (Map.Entry<AnalyzePredication, QueryBuilder> analyzePredicationConsumerEntry : ifPromised.entrySet()) {
+          AnalyzePredication.AnalyzePredicationCondition analyzePredicationCondition = predicationConditionMap.get(analyzePredicationConsumerEntry.getKey());
+          if (analyzePredicationCondition.allMatched()) {
+            return analyzePredicationConsumerEntry.getValue();
+          }
+        }
+        return orElse;
+      });
     }
   }
 
@@ -1311,8 +1345,8 @@ class PredicateAnalyzer {
             .must(addFormatIfNecessary(literal, QueryBuilders.rangeQuery(getFieldReference()).lte(value)));
       } else {
         return new PromisedQueryExpression().
-            ifPromised(AnalyzePredication.CHILDREN_AGGREGATION, x -> builder = QueryBuilders.voidQuery()).
-            orElse(x -> builder = QueryBuilders.termQuery(getFieldReference(), value));
+            promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.childTypeJoinEquation, QueryBuilders.voidQuery()).
+            orElse(QueryBuilders.termQuery(getFieldReference(), value));
       }
       return this;
     }
