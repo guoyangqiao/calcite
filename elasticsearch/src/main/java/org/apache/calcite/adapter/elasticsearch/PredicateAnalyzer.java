@@ -102,8 +102,8 @@ class PredicateAnalyzer {
    * <p>Callers should catch ExpressionNotAnalyzableException
    * and fall back to not using push-down filters.
    *
-   * @param filter  expression belong
-   * @param context context which passed from parent rel
+   * @param expression expression will be analyzed
+   * @param context    context which passed from parent rel
    * @return search query which can be used to query ES cluster
    * @throws ExpressionNotAnalyzableException when expression can't processed by this analyzer
    */
