@@ -218,7 +218,7 @@ class PredicateAnalyzer {
                 final RexLiteral literalRef = (RexLiteral) operands.get(1);
                 final String fieldName = literalRef.getValueAs(String.class);
                 if (relOptTables.size() == 1) {
-                  final ElasticsearchMapping mapping = relOptTables.get(0).unwrap(ElasticsearchTable.class).transport.mapping;
+                  final ElasticsearchMapping mapping = getElasticTable().transport.mapping;
                   final Map<String, ElasticsearchMapping.Datatype> fieldMapping = mapping.mapping();
                   final ElasticsearchMapping.Datatype datatype = fieldMapping.get(fieldName);
                   if (datatype != null) {
@@ -261,6 +261,11 @@ class PredicateAnalyzer {
       return null;
     }
 
+    private ElasticsearchTable getElasticTable() {
+      assert relOptTables.size() == 1;
+      return relOptTables.get(0).unwrap(ElasticsearchTable.class);
+    }
+
     /**
      * Find first object that is a sub-class of given class type.
      * Note that it only handle case with one input which means all nodes are {@link  org.apache.calcite.rel.SingleRel}
@@ -295,7 +300,7 @@ class PredicateAnalyzer {
             if (inputRef.getIndex() == 0 || ID.equalsIgnoreCase(literalRef.getValueAs(String.class))) {
               //start matching the subquery
               if (relOptTables.size() == 1) {
-                final ElasticsearchTable elasticsearchTable = relOptTables.get(0).unwrap(ElasticsearchTable.class);
+                final ElasticsearchTable elasticsearchTable = getElasticTable();
                 if (elasticsearchTable != null) {
                   final RelNode subQueryNode = RelCopyShuttle.copyOf(subQuery.rel);
                   if (subQueryNode.getRowType().getFieldList().size() == 1) {
@@ -341,13 +346,13 @@ class PredicateAnalyzer {
     /**
      * To find whether a rex node contains join type equation, such as customer_child.name = 'parent'
      */
-    static class JoinTypeFinderShuttle extends RexShuttle {
+    static class JoinTypeEquationFinderShuttle extends RexShuttle {
       private final ElasticsearchMapping elasticsearchMapping;
       private final RelNode topNode;
       String joinType = null;
       Boolean parent = null;
 
-      private JoinTypeFinderShuttle(ElasticsearchMapping elasticsearchMapping, RelNode topNode) {
+      private JoinTypeEquationFinderShuttle(ElasticsearchMapping elasticsearchMapping, RelNode topNode) {
         this.elasticsearchMapping = elasticsearchMapping;
         this.topNode = topNode;
       }
@@ -808,10 +813,15 @@ class PredicateAnalyzer {
           return QueryExpression.create(pair.getKey()).like(pair.getValue());
 //          throw new UnsupportedOperationException("LIKE not yet supported");
         case EQUALS: {
-          //TODO test if equation is join field equation
-          return new PromisedQueryExpression(predicationConditionMap).
-              promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.childTypeJoinEquation, QueryBuilders.voidQuery()).
-              orElse(QueryExpression.create(pair.getKey()).equals(pair.getValue()).builder());
+          final QueryExpression equals = QueryExpression.create(pair.getKey()).equals(pair.getValue());
+          JoinTypeEquationFinderShuttle joinTypeEquationFinderShuttle = new JoinTypeEquationFinderShuttle(getElasticTable().transport.mapping, analyzerContext.topNode);
+          call.accept(joinTypeEquationFinderShuttle);
+          if (Boolean.FALSE.equals(joinTypeEquationFinderShuttle.parent) && joinTypeEquationFinderShuttle.joinType != null) {
+            return new PromisedQueryExpression(predicationConditionMap).
+                promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.childTypeJoinEquation, QueryBuilders.voidQuery()).
+                orElse(equals.builder());
+          }
+          return equals;
         }
         case NOT_EQUALS:
           return QueryExpression.create(pair.getKey()).notEquals(pair.getValue());
