@@ -102,14 +102,14 @@ class PredicateAnalyzer {
    * and fall back to not using push-down filters.
    *
    * @param expression expression will be analyzed
-   * @param tables     context which passed from parent rel
+   * @param topNode    node which the expression's belongs to, usually the filter itself, could be null
    * @return search query which can be used to query ES cluster
    * @throws ExpressionNotAnalyzableException when expression can't processed by this analyzer
    */
-  static QueryBuilder analyze(RexNode expression, List<RelOptTable> tables) throws ExpressionNotAnalyzableException {
+  static QueryBuilder analyze(RexNode expression, RelNode topNode) throws ExpressionNotAnalyzableException {
     Objects.requireNonNull(expression, "expression");
     final AnalyzePredication.AnalyzePredicationCondition childAggregationPredictor = new AnalyzePredication.AnalyzePredicationCondition(AnalyzePredication.CHILDREN_AGGREGATION);
-    AnalyzerContext analyzerContext = new AnalyzerContext(ImmutableList.copyOf(tables));
+    AnalyzerContext analyzerContext = new AnalyzerContext(topNode);
     analyzerContext.predicationConditionMap.put(AnalyzePredication.CHILDREN_AGGREGATION, childAggregationPredictor);
     try {
       // visits expression tree
@@ -128,9 +128,11 @@ class PredicateAnalyzer {
   private static class AnalyzerContext {
     final EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap = new EnumMap<>(AnalyzePredication.class);
     final ImmutableList<RelOptTable> tables;
+    final RelNode topNode;
 
-    public AnalyzerContext(ImmutableList<RelOptTable> tables) {
-      this.tables = tables;
+    public AnalyzerContext(RelNode topNode) {
+      this.topNode = topNode;
+      this.tables = ImmutableList.copyOf(RelOptUtil.findAllTables(topNode));
     }
   }
 
@@ -235,7 +237,7 @@ class PredicateAnalyzer {
                               final Filter filter = firstClassInstance(Filter.class, subQueryNode);
                               if (filter != null) {
                                 try {
-                                  queryBuilder = PredicateAnalyzer.analyze(filter.getCondition(), RelOptUtil.findAllTables(filter));
+                                  queryBuilder = PredicateAnalyzer.analyze(filter.getCondition(), filter);
                                 } catch (ExpressionNotAnalyzableException e) {
                                   throw new RuntimeException(e);
                                 }

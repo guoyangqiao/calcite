@@ -17,7 +17,10 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import org.apache.calcite.adapter.java.JavaTypeFactory;
-import org.apache.calcite.plan.*;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -35,35 +38,38 @@ import java.util.stream.Collectors;
  */
 public class ElasticsearchProject extends Project implements ElasticsearchRel {
   ElasticsearchProject(RelOptCluster cluster, RelTraitSet traitSet, RelNode input,
-      List<? extends RexNode> projects, RelDataType rowType) {
+                       List<? extends RexNode> projects, RelDataType rowType) {
     super(cluster, traitSet, input, projects, rowType);
     assert getConvention() == ElasticsearchRel.CONVENTION;
     assert getConvention() == input.getConvention();
   }
 
-  @Override public Project copy(RelTraitSet relTraitSet, RelNode input, List<RexNode> projects,
-      RelDataType relDataType) {
+  @Override
+  public Project copy(RelTraitSet relTraitSet, RelNode input, List<RexNode> projects,
+                      RelDataType relDataType) {
     return new ElasticsearchProject(getCluster(), traitSet, input, projects, relDataType);
   }
 
-  @Override public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+  @Override
+  public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
     return super.computeSelfCost(planner, mq).multiplyBy(0.1);
   }
 
-  @Override public void implement(Implementor implementor) {
+  @Override
+  public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
 
     final List<String> inFields =
-            ElasticsearchRules.elasticsearchFieldNames(getInput().getRowType());
+        ElasticsearchRules.elasticsearchFieldNames(getInput().getRowType());
     final ElasticsearchRules.RexToElasticsearchTranslator translator =
-            new ElasticsearchRules.RexToElasticsearchTranslator(
-                (JavaTypeFactory) getCluster().getTypeFactory(), inFields, RelOptUtil.findAllTables(this), implementor.elasticsearchTable.mapper);
+        new ElasticsearchRules.RexToElasticsearchTranslator(
+            (JavaTypeFactory) getCluster().getTypeFactory(), inFields, this, implementor.elasticsearchTable.mapper);
 
     final List<String> fields = new ArrayList<>();
     final List<String> scriptFields = new ArrayList<>();
     // registers wherever "select *" is present
     boolean hasSelectStar = false;
-    for (Pair<RexNode, String> pair: getNamedProjects()) {
+    for (Pair<RexNode, String> pair : getNamedProjects()) {
       final String name = pair.right;
       final String expr = pair.left.accept(translator);
 
@@ -77,8 +83,8 @@ public class ElasticsearchProject extends Project implements ElasticsearchRel {
         fields.add(name);
       } else if (expr.matches("\"literal\":.+")) {
         scriptFields.add(ElasticsearchRules.quote(name)
-                + ":{\"script\": "
-                + expr.split(":")[1] + "}");
+            + ":{\"script\": "
+            + expr.split(":")[1] + "}");
       } else if (ElasticsearchRules.isCase(pair.left)) {
         //TODO If the query is not a aggregation, the case should fall into script_field which was currently not implemented
         //More information see https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-body.html#request-body-search-script-fields
@@ -110,11 +116,11 @@ public class ElasticsearchProject extends Project implements ElasticsearchRel {
       query.append("\"_source\" : [").append(findString).append("]");
     } else {
       // if scripted fields are present, ES ignores _source attribute
-      for (String field: fields) {
+      for (String field : fields) {
         scriptFields.add(ElasticsearchRules.quote(field) + ":{\"script\": "
-                // _source (ES2) vs params._source (ES5)
-                + "\"" + implementor.elasticsearchTable.scriptedFieldPrefix() + "."
-                + field + "\"}");
+            // _source (ES2) vs params._source (ES5)
+            + "\"" + implementor.elasticsearchTable.scriptedFieldPrefix() + "."
+            + field + "\"}");
       }
       query.append("\"script_fields\": {" + String.join(", ", scriptFields) + "}");
     }

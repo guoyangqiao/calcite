@@ -156,15 +156,15 @@ class ElasticsearchRules {
   static class RexToElasticsearchTranslator extends RexVisitorImpl<String> {
     private final JavaTypeFactory typeFactory;
     private final List<String> inFields;
-    private final List<RelOptTable> allTables;
     private final ObjectMapper mapper;
+    private final RelNode rootNode;
 
-    RexToElasticsearchTranslator(JavaTypeFactory typeFactory, List<String> inFields, List<RelOptTable> tables, ObjectMapper mapper) {
+    RexToElasticsearchTranslator(JavaTypeFactory typeFactory, List<String> inFields, RelNode rootNode, ObjectMapper mapper) {
       super(true);
       this.typeFactory = typeFactory;
       this.inFields = inFields;
-      this.allTables = tables;
       this.mapper = mapper;
+      this.rootNode = rootNode;
     }
 
     @Override
@@ -192,7 +192,7 @@ class ElasticsearchRules {
       if (call.getKind() == SqlKind.CASE) {
         final QueryBuilders.QueryBuilder rexBuilder;
         try {
-          rexBuilder = PredicateAnalyzer.analyze(call, allTables);
+          rexBuilder = PredicateAnalyzer.analyze(call, rootNode);
         } catch (Throwable e) {
           throw new IllegalArgumentException("Translation of " + call
               + " is not supported by ElasticsearchProject", e);

@@ -18,7 +18,10 @@ package org.apache.calcite.adapter.elasticsearch;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.calcite.plan.*;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -27,7 +30,6 @@ import org.apache.calcite.rex.RexNode;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -56,10 +58,9 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
   public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
     ObjectMapper mapper = implementor.elasticsearchTable.mapper;
-    final List<RelOptTable> allTables = RelOptUtil.findAllTables(this);
-    PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator(mapper, allTables);
+    PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator(mapper);
     try {
-      implementor.add(translator.translateMatch(condition));
+      implementor.add(translator.translateMatch(this));
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     } catch (PredicateAnalyzer.ExpressionNotAnalyzableException e) {
@@ -73,19 +74,24 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
    */
   static class PredicateAnalyzerTranslator {
     private final ObjectMapper mapper;
-    private final List<RelOptTable> relOptTables;
 
-    PredicateAnalyzerTranslator(final ObjectMapper mapper, List<RelOptTable> relOptTables) {
+    PredicateAnalyzerTranslator(final ObjectMapper mapper) {
       this.mapper = Objects.requireNonNull(mapper, "mapper");
-      this.relOptTables = relOptTables;
     }
 
-    String translateMatch(RexNode condition) throws IOException,
+    /**
+     * We need the node which expression belongs to and the node, so we use node as parameter
+     *
+     * @return Query string
+     * @throws IOException                                        ignore
+     * @throws PredicateAnalyzer.ExpressionNotAnalyzableException ignore
+     */
+    String translateMatch(Filter filter) throws IOException,
         PredicateAnalyzer.ExpressionNotAnalyzableException {
 
       StringWriter writer = new StringWriter();
       JsonGenerator generator = mapper.getFactory().createGenerator(writer);
-      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(condition, relOptTables)).writeJson(generator);
+      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(filter.getCondition(), filter)).writeJson(generator);
       generator.flush();
       generator.close();
       return "{\"query\" : " + writer.toString() + "}";
