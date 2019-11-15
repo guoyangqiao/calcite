@@ -244,7 +244,7 @@ class PredicateAnalyzer {
                               } else {
                                 queryBuilder = QueryBuilders.matchAll();
                               }
-                              return new PromisedQueryExpression(predicationConditionMap).promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.RootIdSelection, queryBuilder).orElse(null);
+                              return new PromisedQueryExpression(predicationConditionMap).promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredication.AnalyzePredicationConditionKey.RootIdSelection, queryBuilder).orElse(null);
                             }
                           }
                         }
@@ -818,7 +818,7 @@ class PredicateAnalyzer {
           call.accept(joinTypeEquationFinderShuttle);
           if (Boolean.FALSE.equals(joinTypeEquationFinderShuttle.parent) && joinTypeEquationFinderShuttle.joinType != null) {
             return new PromisedQueryExpression(predicationConditionMap).
-                promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredicationCondition.childTypeJoinEquation, QueryBuilders.voidQuery()).
+                promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredication.AnalyzePredicationConditionKey.childTypeJoinEquation, QueryBuilders.voidQuery()).
                 orElse(equals.builder());
           }
           return equals;

@@ -34,9 +34,10 @@ public enum AnalyzePredication {
       return conditions.containsAll(Sets.newHashSet(predication.requiredConditions));
     }
   }
-}
 
-class AnalyzePredicationCondition {
-  final static String childTypeJoinEquation = "childTypeJoinEquation";
-  final static String RootIdSelection = "rootIdSelection";
+
+  static class AnalyzePredicationConditionKey {
+    final static String childTypeJoinEquation = "childTypeJoinEquation";
+    final static String RootIdSelection = "rootIdSelection";
+  }
 }
