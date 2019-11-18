@@ -139,8 +139,7 @@ public class ViewTable
       RelNode project = root.rel;
       //While using DynamicRecordType, row type may changed already, fix it by remake target rel
       assert project instanceof Project;
-      sameOrderRowFieldProject((Project) project, rowType, context.getCluster().getRexBuilder());
-      List<RexNode> projects = ((Project) project).getProjects();
+      List<RexNode> projects = sameOrderRowFieldProject((Project) project, rowType, context.getCluster().getRexBuilder());
       project = ((Project) project).copy(project.getTraitSet(), project.getInput(0), projects, rowType);
       final RelNode rel = RelOptUtil.createCastRel(project, rowType, true);
       // Expand any views
@@ -166,8 +165,10 @@ public class ViewTable
 
   /**
    * Make sure projection mapping to row type, only check name, does not check type
+   *
+   * @return
    */
-  private void sameOrderRowFieldProject(Project project, RelDataType targetRowType, RexBuilder rexBuilder) {
+  private List<RexNode> sameOrderRowFieldProject(Project project, RelDataType targetRowType, RexBuilder rexBuilder) {
     List<RexNode> projects = project.getChildExps();
     List<RelDataTypeField> targetFieldList = targetRowType.getFieldList();
     int fieldSize = targetFieldList.size();
@@ -188,8 +189,9 @@ public class ViewTable
         sourceFields.add(new RelDataTypeFieldImpl(targetField.getName(), targetField.getIndex(), targetField.getType()));
       }
       RelRecordType relRecordType = new RelRecordType(sourceFields);
-      RexUtil.generateCastExpressions(rexBuilder, targetRowType, relRecordType);
+      return RexUtil.generateCastExpressions(rexBuilder, targetRowType, relRecordType);
     }
+    return project.getChildExps();
   }
 }
 
