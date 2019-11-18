@@ -35,6 +35,7 @@ import org.apache.calcite.rel.metadata.RelColumnMapping;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.stream.Delta;
 import org.apache.calcite.rel.stream.LogicalDelta;
+import org.apache.calcite.rel.type.DynamicRecordType;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -3598,7 +3599,12 @@ public class SqlToRelConverter {
     for (String name : qualified.suffix()) {
       if (e == e0.left && e0.right != null) {
         int i = e0.right.get(name);
-        e = rexBuilder.makeFieldAccess(e, i);
+        //Dynamic Record may be added first to bypass index range check, use field name to trigger dynamic record type add field
+        if (e.getType() instanceof DynamicRecordType) {
+          e = rexBuilder.makeFieldAccess(e, name, false);
+        } else {
+          e = rexBuilder.makeFieldAccess(e, i);
+        }
       } else {
         final boolean caseSensitive = true; // name already fully-qualified
         if (identifier.isStar() && bb.scope instanceof MatchRecognizeScope) {
