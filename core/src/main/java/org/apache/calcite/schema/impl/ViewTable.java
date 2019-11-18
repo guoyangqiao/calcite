@@ -175,7 +175,7 @@ public class ViewTable
     int projectSize = projects.size();
     int min = Math.min(fieldSize, projectSize);
     for (int i = 0; i < min; i++) {
-      String rexName = ((RexLiteral) ((RexCall) (((RexCall) projects.get(i)).getOperands().get(1))).getOperands().get(1)).getValueAs(String.class);
+      String rexName = ((RexLiteral) ((RexCall) (((RexCall) projects.get(i)).getOperands().get(0))).getOperands().get(1)).getValueAs(String.class);
       String rowTypeName = targetFieldList.get(i).getName();
       if (!Objects.equals(rexName, rowTypeName)) {
         throw new IllegalArgumentException("Row type check failed, " + i + ", " + rexName + " ," + rowTypeName);
