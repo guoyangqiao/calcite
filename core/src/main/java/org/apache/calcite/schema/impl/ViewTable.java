@@ -130,7 +130,7 @@ public class ViewTable
       RelNode project = root.rel;
       //While using DynamicRecordType, row type may changed already, fix it by remake target rel
       assert project instanceof Project;
-      ((Project) project).copy(project.getTraitSet(), project.getInput(0), ((Project) project).getProjects(), rowType);
+      project = ((Project) project).copy(project.getTraitSet(), project.getInput(0), ((Project) project).getProjects(), rowType);
       final RelNode rel = RelOptUtil.createCastRel(project, rowType, true);
       // Expand any views
       final RelNode rel2 = rel.accept(
