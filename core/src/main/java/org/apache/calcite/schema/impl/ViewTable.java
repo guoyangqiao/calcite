@@ -26,6 +26,7 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.RelShuttleImpl;
+import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -126,7 +127,11 @@ public class ViewTable
     try {
       final RelRoot root =
           context.expandView(rowType, queryString, schemaPath, viewPath);
-      final RelNode rel = RelOptUtil.createCastRel(root.rel, rowType, true);
+      RelNode project = root.rel;
+      //While using DynamicRecordType, row type may changed already, fix it by remake target rel
+      assert project instanceof Project;
+      ((Project) project).copy(project.getTraitSet(), project.getInput(0), ((Project) project).getProjects(), rowType);
+      final RelNode rel = RelOptUtil.createCastRel(project, rowType, true);
       // Expand any views
       final RelNode rel2 = rel.accept(
           new RelShuttleImpl() {
