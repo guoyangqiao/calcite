@@ -28,15 +28,16 @@ import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelProtoDataType;
+import org.apache.calcite.rel.type.*;
+import org.apache.calcite.rex.*;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.TranslatableTable;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Table whose contents are defined using an SQL statement.
@@ -52,7 +53,7 @@ public class ViewTable
   private final List<String> viewPath;
 
   public ViewTable(Type elementType, RelProtoDataType rowType, String viewSql,
-      List<String> schemaPath, List<String> viewPath) {
+                   List<String> schemaPath, List<String> viewPath) {
     super(elementType);
     this.viewSql = viewSql;
     this.schemaPath = ImmutableList.copyOf(schemaPath);
@@ -62,47 +63,55 @@ public class ViewTable
 
   @Deprecated // to be removed before 2.0
   public static ViewTableMacro viewMacro(SchemaPlus schema,
-      final String viewSql, final List<String> schemaPath) {
+                                         final String viewSql, final List<String> schemaPath) {
     return viewMacro(schema, viewSql, schemaPath, null, Boolean.TRUE);
   }
 
   @Deprecated // to be removed before 2.0
   public static ViewTableMacro viewMacro(SchemaPlus schema, String viewSql,
-      List<String> schemaPath, Boolean modifiable) {
+                                         List<String> schemaPath, Boolean modifiable) {
     return viewMacro(schema, viewSql, schemaPath, null, modifiable);
   }
 
-  /** Table macro that returns a view.
+  /**
+   * Table macro that returns a view.
    * For the purpose of executing query which has dynamic field
    *
-   * @param schema Schema the view will belong to
-   * @param viewSql SQL query
+   * @param schema     Schema the view will belong to
+   * @param viewSql    SQL query
    * @param schemaPath Path of schema
    * @param modifiable Whether view is modifiable, or null to deduce it
    */
   public static ViewTableMacro viewMacro(SchemaPlus schema, String viewSql,
-      List<String> schemaPath, List<String> viewPath, Boolean modifiable) {
+                                         List<String> schemaPath, List<String> viewPath, Boolean modifiable) {
     return new ViewTableMacro.DynamicRowTypeViewTableMarco(CalciteSchema.from(schema), viewSql, schemaPath, viewPath, modifiable);
 //    return new ViewTableMacro(CalciteSchema.from(schema), viewSql, schemaPath,
 //        viewPath, modifiable);
   }
 
-  /** Returns the view's SQL definition. */
+  /**
+   * Returns the view's SQL definition.
+   */
   public String getViewSql() {
     return viewSql;
   }
 
-  /** Returns the the schema path of the view. */
+  /**
+   * Returns the the schema path of the view.
+   */
   public List<String> getSchemaPath() {
     return schemaPath;
   }
 
-  /** Returns the the path of the view. */
+  /**
+   * Returns the the path of the view.
+   */
   public List<String> getViewPath() {
     return viewPath;
   }
 
-  @Override public Schema.TableType getJdbcTableType() {
+  @Override
+  public Schema.TableType getJdbcTableType() {
     return Schema.TableType.VIEW;
   }
 
@@ -111,7 +120,7 @@ public class ViewTable
   }
 
   public <T> Queryable<T> asQueryable(QueryProvider queryProvider,
-      SchemaPlus schema, String tableName) {
+                                      SchemaPlus schema, String tableName) {
     return queryProvider.createQuery(
         getExpression(schema, tableName, Queryable.class), elementType);
   }
@@ -123,19 +132,22 @@ public class ViewTable
   }
 
   private RelRoot expandView(RelOptTable.ToRelContext context,
-      RelDataType rowType, String queryString) {
+                             RelDataType rowType, String queryString) {
     try {
       final RelRoot root =
           context.expandView(rowType, queryString, schemaPath, viewPath);
       RelNode project = root.rel;
       //While using DynamicRecordType, row type may changed already, fix it by remake target rel
       assert project instanceof Project;
-      project = ((Project) project).copy(project.getTraitSet(), project.getInput(0), ((Project) project).getProjects(), rowType);
+      sameOrderRowFieldProject((Project) project, rowType, context.getCluster().getRexBuilder());
+      List<RexNode> projects = ((Project) project).getProjects();
+      project = ((Project) project).copy(project.getTraitSet(), project.getInput(0), projects, rowType);
       final RelNode rel = RelOptUtil.createCastRel(project, rowType, true);
       // Expand any views
       final RelNode rel2 = rel.accept(
           new RelShuttleImpl() {
-            @Override public RelNode visit(TableScan scan) {
+            @Override
+            public RelNode visit(TableScan scan) {
               final RelOptTable table = scan.getTable();
               final TranslatableTable translatableTable =
                   table.unwrap(TranslatableTable.class);
@@ -149,6 +161,34 @@ public class ViewTable
     } catch (Exception e) {
       throw new RuntimeException("Error while parsing view definition: "
           + queryString, e);
+    }
+  }
+
+  /**
+   * Make sure projection mapping to row type, only check name, does not check type
+   */
+  private void sameOrderRowFieldProject(Project project, RelDataType targetRowType, RexBuilder rexBuilder) {
+    List<RexNode> projects = project.getChildExps();
+    List<RelDataTypeField> targetFieldList = targetRowType.getFieldList();
+    int fieldSize = targetFieldList.size();
+    int projectSize = projects.size();
+    int min = Math.min(fieldSize, projectSize);
+    for (int i = 0; i < min; i++) {
+      String rexName = ((RexLiteral) ((RexCall) (((RexCall) projects.get(i)).getOperands().get(1))).getOperands().get(1)).getValueAs(String.class);
+      String rowTypeName = targetFieldList.get(i).getName();
+      if (!Objects.equals(rexName, rowTypeName)) {
+        throw new IllegalArgumentException(String.format("Row type check failed, %s, %s ,%s", i, rexName, rowTypeName));
+      }
+    }
+    if (fieldSize > projectSize) {
+      RelDataType rowType = project.getRowType();
+      List<RelDataTypeField> sourceFields = new ArrayList<>(rowType.getFieldList());
+      for (int i = projectSize; i < fieldSize; i++) {
+        RelDataTypeField targetField = targetFieldList.get(i);
+        sourceFields.add(new RelDataTypeFieldImpl(targetField.getName(), targetField.getIndex(), targetField.getType()));
+      }
+      RelRecordType relRecordType = new RelRecordType(sourceFields);
+      RexUtil.generateCastExpressions(rexBuilder, targetRowType, relRecordType);
     }
   }
 }
