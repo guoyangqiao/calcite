@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.schema.impl;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.calcite.adapter.java.AbstractQueryableTable;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.linq4j.QueryProvider;
@@ -32,8 +33,6 @@ import org.apache.calcite.rel.type.RelProtoDataType;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.TranslatableTable;
-
-import com.google.common.collect.ImmutableList;
 
 import java.lang.reflect.Type;
 import java.util.List;
@@ -73,6 +72,7 @@ public class ViewTable
   }
 
   /** Table macro that returns a view.
+   * For the purpose of executing query which has dynamic field
    *
    * @param schema Schema the view will belong to
    * @param viewSql SQL query
@@ -81,8 +81,9 @@ public class ViewTable
    */
   public static ViewTableMacro viewMacro(SchemaPlus schema, String viewSql,
       List<String> schemaPath, List<String> viewPath, Boolean modifiable) {
-    return new ViewTableMacro(CalciteSchema.from(schema), viewSql, schemaPath,
-        viewPath, modifiable);
+    return new ViewTableMacro.DynamicRowTypeViewTableMarco(CalciteSchema.from(schema), viewSql, schemaPath, viewPath, modifiable);
+//    return new ViewTableMacro(CalciteSchema.from(schema), viewSql, schemaPath,
+//        viewPath, modifiable);
   }
 
   /** Returns the view's SQL definition. */

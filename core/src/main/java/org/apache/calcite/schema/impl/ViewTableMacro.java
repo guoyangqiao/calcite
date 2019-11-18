@@ -16,30 +16,33 @@
  */
 package org.apache.calcite.schema.impl;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.jdbc.CalcitePrepare;
 import org.apache.calcite.jdbc.CalciteSchema;
-import org.apache.calcite.rel.type.RelDataTypeImpl;
+import org.apache.calcite.rel.type.*;
 import org.apache.calcite.schema.FunctionParameter;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.TableMacro;
 import org.apache.calcite.schema.TranslatableTable;
 
-import com.google.common.collect.ImmutableList;
-
 import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.List;
 
-/** Table function that implements a view. It returns the operator
- * tree of the view's SQL query. */
+/**
+ * Table function that implements a view. It returns the operator
+ * tree of the view's SQL query.
+ */
 public class ViewTableMacro implements TableMacro {
   protected final String viewSql;
   protected final CalciteSchema schema;
   private final Boolean modifiable;
-  /** Typically null. If specified, overrides the path of the schema as the
-   * context for validating {@code viewSql}. */
+  /**
+   * Typically null. If specified, overrides the path of the schema as the
+   * context for validating {@code viewSql}.
+   */
   protected final List<String> schemaPath;
   protected final List<String> viewPath;
 
@@ -54,7 +57,7 @@ public class ViewTableMacro implements TableMacro {
    *                   of {@code viewSql})
    */
   public ViewTableMacro(CalciteSchema schema, String viewSql,
-      List<String> schemaPath, List<String> viewPath, Boolean modifiable) {
+                        List<String> schemaPath, List<String> viewPath, Boolean modifiable) {
     this.viewSql = viewSql;
     this.schema = schema;
     this.viewPath = viewPath == null ? null : ImmutableList.copyOf(viewPath);
@@ -84,11 +87,13 @@ public class ViewTableMacro implements TableMacro {
     }
   }
 
-  /** Allows a sub-class to return an extension of {@link ModifiableViewTable}
-   * by overriding this method. */
+  /**
+   * Allows a sub-class to return an extension of {@link ModifiableViewTable}
+   * by overriding this method.
+   */
   protected ModifiableViewTable modifiableViewTable(CalcitePrepare.AnalyzeViewResult parsed,
-      String viewSql, List<String> schemaPath, List<String> viewPath,
-      CalciteSchema schema) {
+                                                    String viewSql, List<String> schemaPath, List<String> viewPath,
+                                                    CalciteSchema schema) {
     final JavaTypeFactory typeFactory = (JavaTypeFactory) parsed.typeFactory;
     final Type elementType = typeFactory.getJavaClass(parsed.rowType);
     return new ModifiableViewTable(elementType,
@@ -97,15 +102,49 @@ public class ViewTableMacro implements TableMacro {
         parsed.constraint, parsed.columnMapping);
   }
 
-  /** Allows a sub-class to return an extension of {@link ViewTable} by
-   * overriding this method. */
+  /**
+   * Allows a sub-class to return an extension of {@link ViewTable} by
+   * overriding this method.
+   */
   protected ViewTable viewTable(CalcitePrepare.AnalyzeViewResult parsed,
-      String viewSql, List<String> schemaPath, List<String> viewPath) {
+                                String viewSql, List<String> schemaPath, List<String> viewPath) {
     final JavaTypeFactory typeFactory = (JavaTypeFactory) parsed.typeFactory;
     final Type elementType = typeFactory.getJavaClass(parsed.rowType);
     return new ViewTable(elementType,
         RelDataTypeImpl.proto(parsed.rowType), viewSql, schemaPath, viewPath);
   }
+
+  /**
+   * Small trick of {@link ViewTableMacro}
+   */
+  static class DynamicRowTypeViewTableMarco extends ViewTableMacro {
+
+    /**
+     * Creates a ViewTableMacro. This marco override viewTable so we can get dynamic row type
+     *
+     * @param schema     Root schema
+     * @param viewSql    SQL defining the view
+     * @param schemaPath Schema path relative to the root schema
+     * @param viewPath   View path relative to the schema path
+     * @param modifiable Request that a view is modifiable (dependent on analysis
+     *                   of {@code viewSql})
+     */
+    public DynamicRowTypeViewTableMarco(CalciteSchema schema, String viewSql, List<String> schemaPath, List<String> viewPath, Boolean modifiable) {
+      super(schema, viewSql, schemaPath, viewPath, modifiable);
+    }
+
+    @Override
+    protected ViewTable viewTable(CalcitePrepare.AnalyzeViewResult parsed, String viewSql, List<String> schemaPath, List<String> viewPath) {
+      final RelRecordType rowType = (RelRecordType) parsed.rowType;
+      final JavaTypeFactory typeFactory = (JavaTypeFactory) parsed.typeFactory;
+      final RelDataType dynamicRecordType = new DynamicRecordTypeImpl(typeFactory);
+      //Fulfill origin row fields
+      List<RelDataTypeField> fieldList = dynamicRecordType.getFieldList();
+      fieldList.addAll(rowType.getFieldList());
+      return new ViewTable(typeFactory.getJavaClass(rowType), RelDataTypeImpl.proto(dynamicRecordType), viewSql, schemaPath, viewPath);
+    }
+  }
+
 }
 
 // End ViewTableMacro.java
