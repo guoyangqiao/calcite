@@ -178,7 +178,7 @@ public class ViewTable
       String rexName = ((RexLiteral) ((RexCall) (((RexCall) projects.get(i)).getOperands().get(1))).getOperands().get(1)).getValueAs(String.class);
       String rowTypeName = targetFieldList.get(i).getName();
       if (!Objects.equals(rexName, rowTypeName)) {
-        throw new IllegalArgumentException(String.format("Row type check failed, %s, %s ,%s", i, rexName, rowTypeName));
+        throw new IllegalArgumentException("Row type check failed, " + i + ", " + rexName + " ," + rowTypeName);
       }
     }
     if (fieldSize > projectSize) {
