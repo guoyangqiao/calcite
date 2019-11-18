@@ -28,11 +28,15 @@ import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
-import org.apache.calcite.rel.type.*;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.rel.type.RelProtoDataType;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.TranslatableTable;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -182,14 +186,14 @@ public class ViewTable
       }
     }
     if (fieldSize > projectSize) {
-      RelDataType rowType = project.getRowType();
-      List<RelDataTypeField> sourceFields = new ArrayList<>(rowType.getFieldList());
+      RexNode node = projects.get(0);
+      final RelDataType mapType = ((RexCall) (((RexCall) node).getOperands().get(0))).getOperands().get(0).getType();
+      List<RexNode> sourceFields = new ArrayList<>(projects);
       for (int i = projectSize; i < fieldSize; i++) {
         RelDataTypeField targetField = targetFieldList.get(i);
-        sourceFields.add(new RelDataTypeFieldImpl(targetField.getName(), targetField.getIndex(), targetField.getType()));
+        sourceFields.add(rexBuilder.makeCast(targetField.getType(), rexBuilder.makeCall(SqlStdOperatorTable.ITEM, rexBuilder.makeInputRef(mapType, 0), rexBuilder.makeLiteral(targetField.getName()))));
       }
-      RelRecordType relRecordType = new RelRecordType(sourceFields);
-      return RexUtil.generateCastExpressions(rexBuilder, targetRowType, relRecordType);
+      return RexUtil.generateCastExpressions(rexBuilder, targetRowType, sourceFields);
     }
     return project.getChildExps();
   }
