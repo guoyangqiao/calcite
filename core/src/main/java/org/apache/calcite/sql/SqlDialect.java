@@ -16,6 +16,9 @@
  */
 package org.apache.calcite.sql;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
+import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.avatica.util.DateTimeUtils;
 import org.apache.calcite.avatica.util.Quoting;
@@ -36,14 +39,11 @@ import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Suppliers;
-import com.google.common.collect.ImmutableSet;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.Timestamp;
@@ -53,8 +53,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * <code>SqlDialect</code> encapsulates the differences between dialects of SQL.
@@ -420,7 +418,10 @@ public class SqlDialect {
   public void quoteStringLiteral(StringBuilder buf, String charsetName,
       String val) {
     if (containsNonAscii(val) && charsetName == null) {
-      quoteStringLiteralUnicode(buf, val);
+//      quoteStringLiteralUnicode(buf, val);
+      buf.append(literalEndQuoteString);
+      buf.append(val.replace(literalEndQuoteString, literalEscapedQuote));
+      buf.append(literalEndQuoteString);
     } else {
       if (charsetName != null) {
         buf.append("_");
@@ -1106,8 +1107,7 @@ public class SqlDialect {
   public static class FakeUtil {
     public static Error newInternal(Throwable e, String s) {
       String message = "Internal error: \u0000" + s;
-      AssertionError ae = new AssertionError(message);
-      ae.initCause(e);
+      AssertionError ae = new AssertionError(message, e);
       return ae;
     }
 
@@ -1152,7 +1152,7 @@ public class SqlDialect {
     NULL,
     LOCAL,
     DIRECT,
-    SHIFT;
+    SHIFT
   }
 
   /**
