@@ -230,8 +230,9 @@ public final class CalciteSystemProperty<T> {
    */
   // TODO review zabetak:
   // What happens if a wrong value is specified?
+  // Modified by GYQ on 2019-11-21 11:44:52, always use UTF-8
   public static final CalciteSystemProperty<String> DEFAULT_CHARSET =
-      stringProperty("calcite.default.charset", "ISO-8859-1");
+      stringProperty("calcite.default.charset", "UTF-8");
 
   /**
    * The name of the default national character set.
