@@ -158,13 +158,15 @@ class ElasticsearchRules {
     private final List<String> inFields;
     private final ObjectMapper mapper;
     private final RelNode rootNode;
+    private final ElasticsearchRel.ElasticsearchImplementContext relContext;
 
-    RexToElasticsearchTranslator(JavaTypeFactory typeFactory, List<String> inFields, RelNode rootNode, ObjectMapper mapper) {
+    RexToElasticsearchTranslator(JavaTypeFactory typeFactory, List<String> inFields, RelNode rootNode, ObjectMapper mapper, ElasticsearchRel.ElasticsearchImplementContext relContext) {
       super(true);
       this.typeFactory = typeFactory;
       this.inFields = inFields;
       this.mapper = mapper;
       this.rootNode = rootNode;
+      this.relContext = relContext;
     }
 
     @Override
@@ -192,7 +194,7 @@ class ElasticsearchRules {
       if (call.getKind() == SqlKind.CASE) {
         final QueryBuilders.QueryBuilder rexBuilder;
         try {
-          rexBuilder = PredicateAnalyzer.analyze(call, rootNode);
+          rexBuilder = PredicateAnalyzer.analyze(call, rootNode, relContext);
         } catch (Throwable e) {
           throw new IllegalArgumentException("Translation of " + call
               + " is not supported by ElasticsearchProject", e);

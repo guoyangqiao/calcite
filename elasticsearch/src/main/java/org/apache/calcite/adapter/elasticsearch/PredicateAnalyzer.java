@@ -101,19 +101,19 @@ class PredicateAnalyzer {
    * <p>Callers should catch ExpressionNotAnalyzableException
    * and fall back to not using push-down filters.
    *
-   * @param expression expression will be analyzed
-   * @param topNode    node which the expression's belongs to, usually the filter itself, could be null
+   * @param expression              expression will be analyzed
+   * @param topNode                 node which the expression's belongs to, usually the filter itself, could be null
+   * @param elasticsearchRelContext
    * @return search query which can be used to query ES cluster
    * @throws ExpressionNotAnalyzableException when expression can't processed by this analyzer
    */
-  static QueryBuilder analyze(RexNode expression, RelNode topNode) throws ExpressionNotAnalyzableException {
+  static QueryBuilder analyze(RexNode expression, RelNode topNode, ElasticsearchRel.ElasticsearchImplementContext elasticsearchRelContext) throws ExpressionNotAnalyzableException {
     Objects.requireNonNull(expression, "expression");
     final AnalyzePredication.AnalyzePredicationCondition childAggregationPredictor = new AnalyzePredication.AnalyzePredicationCondition(AnalyzePredication.CHILDREN_AGGREGATION);
-    AnalyzerContext analyzerContext = new AnalyzerContext(topNode);
-    analyzerContext.predicationConditionMap.put(AnalyzePredication.CHILDREN_AGGREGATION, childAggregationPredictor);
+    elasticsearchRelContext.analyzePredicationMap.put(AnalyzePredication.CHILDREN_AGGREGATION, childAggregationPredictor);
     try {
       // visits expression tree
-      QueryExpression e = (QueryExpression) expression.accept(new Visitor(analyzerContext));
+      QueryExpression e = (QueryExpression) expression.accept(new Visitor(topNode, elasticsearchRelContext.analyzePredicationMap));
 
       if (e != null && e.isPartial()) {
         throw new UnsupportedOperationException("Can't handle partial QueryExpression: " + e);
@@ -122,17 +122,6 @@ class PredicateAnalyzer {
     } catch (Throwable e) {
       Throwables.propagateIfPossible(e, UnsupportedOperationException.class);
       throw new ExpressionNotAnalyzableException("Can't convert " + expression, e);
-    }
-  }
-
-  private static class AnalyzerContext {
-    final EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap = new EnumMap<>(AnalyzePredication.class);
-    final ImmutableList<RelOptTable> tables;
-    final RelNode topNode;
-
-    public AnalyzerContext(RelNode topNode) {
-      this.topNode = topNode;
-      this.tables = ImmutableList.copyOf(RelOptUtil.findAllTables(topNode));
     }
   }
 
@@ -174,15 +163,15 @@ class PredicateAnalyzer {
     static final String ID = "ID";
     static final String TYPE_KEY = "type";
     static final String RELATIONS_KEY = "relations";
-    private final AnalyzerContext analyzerContext;
+    private final RelNode topNode;
     private final ImmutableList<RelOptTable> relOptTables;
     private final EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> predicationConditionMap;
 
-    private Visitor(AnalyzerContext analyzerContext) {
+    private Visitor(RelNode topNode, EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> analyzePredicationMap) {
       super(true);
-      this.analyzerContext = analyzerContext;
-      this.relOptTables = analyzerContext.tables;
-      this.predicationConditionMap = analyzerContext.predicationConditionMap;
+      this.topNode = topNode;
+      this.relOptTables = ImmutableList.copyOf(RelOptUtil.findAllTables(topNode));
+      this.predicationConditionMap = analyzePredicationMap;
     }
 
     public Expression visitSubQuery(RexSubQuery subQuery) {
@@ -237,14 +226,16 @@ class PredicateAnalyzer {
                               final Filter filter = firstClassInstance(Filter.class, subQueryNode);
                               if (filter != null) {
                                 try {
-                                  queryBuilder = PredicateAnalyzer.analyze(filter.getCondition(), filter);
+                                  ElasticsearchRel.ElasticsearchImplementContext implementContext = new ElasticsearchRel.ElasticsearchImplementContext();
+                                  //TODO do we need to use this rel context?
+                                  queryBuilder = PredicateAnalyzer.analyze(filter.getCondition(), filter, implementContext);
                                 } catch (ExpressionNotAnalyzableException e) {
                                   throw new RuntimeException(e);
                                 }
                               } else {
                                 queryBuilder = QueryBuilders.matchAll();
                               }
-                              return new PromisedQueryExpression(predicationConditionMap).promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredication.AnalyzePredicationConditionKey.RootIdSelection, queryBuilder).orElse(null);
+                              return new PromisedQueryExpression(predicationConditionMap).promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredication.AnalyzePredicationConditionKey.ROOT_ID_SELECTION, queryBuilder).orElse(null);
                             }
                           }
                         }
@@ -847,11 +838,11 @@ class PredicateAnalyzer {
 //          throw new UnsupportedOperationException("LIKE not yet supported");
         case EQUALS: {
           final QueryExpression equals = QueryExpression.create(pair.getKey()).equals(pair.getValue());
-          JoinTypeEquationFinderShuttle joinTypeEquationFinderShuttle = new JoinTypeEquationFinderShuttle(getElasticTable().transport.mapping, analyzerContext.topNode);
+          JoinTypeEquationFinderShuttle joinTypeEquationFinderShuttle = new JoinTypeEquationFinderShuttle(getElasticTable().transport.mapping, topNode);
           call.accept(joinTypeEquationFinderShuttle);
           if (Boolean.FALSE.equals(joinTypeEquationFinderShuttle.parent) && joinTypeEquationFinderShuttle.joinType != null) {
             return new PromisedQueryExpression(predicationConditionMap).
-                promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredication.AnalyzePredicationConditionKey.ChildTypeJoinEquation, QueryBuilders.voidQuery()).
+                promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredication.AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION, QueryBuilders.voidQuery()).
                 orElse(equals.builder());
           }
           return equals;

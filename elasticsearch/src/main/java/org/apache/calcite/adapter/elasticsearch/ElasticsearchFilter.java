@@ -60,7 +60,7 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
     ObjectMapper mapper = implementor.elasticsearchTable.mapper;
     PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator(mapper);
     try {
-      implementor.add(translator.translateMatch(this));
+      implementor.add(translator.translateMatch(this, implementor.relContext));
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     } catch (PredicateAnalyzer.ExpressionNotAnalyzableException e) {
@@ -86,12 +86,12 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
      * @throws IOException                                        ignore
      * @throws PredicateAnalyzer.ExpressionNotAnalyzableException ignore
      */
-    String translateMatch(Filter filter) throws IOException,
+    String translateMatch(Filter filter, ElasticsearchImplementContext relContext) throws IOException,
         PredicateAnalyzer.ExpressionNotAnalyzableException {
 
       StringWriter writer = new StringWriter();
       JsonGenerator generator = mapper.getFactory().createGenerator(writer);
-      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(filter.getCondition(), filter)).writeJson(generator);
+      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(filter.getCondition(), filter, relContext)).writeJson(generator);
       generator.flush();
       generator.close();
       return "{\"query\" : " + writer.toString() + "}";

@@ -46,18 +46,21 @@ public interface ElasticsearchRel extends RelNode {
 
     /**
      * Sorting clauses.
+     *
      * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-sort.html">Sort</a>
      */
     final List<Map.Entry<String, RelFieldCollation.Direction>> sort = new ArrayList<>();
 
     /**
      * Elastic aggregation ({@code MIN / MAX / COUNT} etc.) statements (functions).
+     *
      * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations.html">aggregations</a>
      */
     final List<Map.Entry<String, String>> aggregations = new ArrayList<>();
 
     /**
      * Allows bucketing documents together. Similar to {@code select ... from table group by field1}
+     *
      * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/6.3/search-aggregations-bucket.html">Bucket Aggregrations</a>
      */
     final List<String> groupBy = new ArrayList<>();
@@ -78,18 +81,24 @@ public interface ElasticsearchRel extends RelNode {
 
     /**
      * Starting index (default {@code 0}). Equivalent to {@code start} in ES query.
+     *
      * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-from-size.html">From/Size</a>
      */
     Long offset;
 
     /**
      * Number of records to return. Equivalent to {@code size} in ES query.
+     *
      * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-from-size.html">From/Size</a>
      */
     Long fetch;
 
     RelOptTable table;
     ElasticsearchTable elasticsearchTable;
+    /**
+     * Context during elastic search query implementation
+     */
+    ElasticsearchImplementContext relContext;
 
     void add(String findOp) {
       list.add(findOp);
@@ -130,6 +139,14 @@ public interface ElasticsearchRel extends RelNode {
       ((ElasticsearchRel) input).implement(this);
     }
 
+  }
+
+  /**
+   * Context used while calling {@link ElasticsearchRel#implement(Implementor)}
+   */
+  class ElasticsearchImplementContext {
+
+    EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> analyzePredicationMap = new EnumMap<>(AnalyzePredication.class);
   }
 }
 

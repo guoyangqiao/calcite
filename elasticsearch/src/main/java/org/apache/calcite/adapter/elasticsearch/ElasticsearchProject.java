@@ -63,7 +63,7 @@ public class ElasticsearchProject extends Project implements ElasticsearchRel {
         ElasticsearchRules.elasticsearchFieldNames(getInput().getRowType());
     final ElasticsearchRules.RexToElasticsearchTranslator translator =
         new ElasticsearchRules.RexToElasticsearchTranslator(
-            (JavaTypeFactory) getCluster().getTypeFactory(), inFields, this, implementor.elasticsearchTable.mapper);
+            (JavaTypeFactory) getCluster().getTypeFactory(), inFields, this, implementor.elasticsearchTable.mapper, implementor.relContext);
 
     final List<String> fields = new ArrayList<>();
     final List<String> scriptFields = new ArrayList<>();

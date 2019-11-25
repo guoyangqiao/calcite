@@ -9,7 +9,7 @@ import java.util.Set;
  * Tag which will decide the result of {@link PredicateAnalyzer.PromisedQueryExpression#builder()}
  */
 public enum AnalyzePredication {
-  CHILDREN_AGGREGATION(AnalyzePredicationConditionKey.ChildTypeJoinEquation, AnalyzePredicationConditionKey.RootIdSelection);
+  CHILDREN_AGGREGATION(AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION, AnalyzePredicationConditionKey.ROOT_ID_SELECTION);
 
   private Object[] requiredConditions;
 
@@ -17,7 +17,7 @@ public enum AnalyzePredication {
     this.requiredConditions = conditions;
   }
 
-  public static class AnalyzePredicationCondition {
+  static class AnalyzePredicationCondition {
     private final AnalyzePredication predication;
     private Set<Object> conditions;
 
@@ -37,7 +37,7 @@ public enum AnalyzePredication {
 
 
   static class AnalyzePredicationConditionKey {
-    final static String ChildTypeJoinEquation = "childTypeJoinEquation";
-    final static String RootIdSelection = "rootIdSelection";
+    final static String CHILD_TYPE_JOIN_EQUATION = "childTypeJoinEquation";
+    final static String ROOT_ID_SELECTION = "rootIdSelection";
   }
 }
