@@ -84,7 +84,7 @@ public class ElasticsearchToEnumerableConverter extends ConverterImpl implements
         Expressions.constant(implementor.expressionItemMap));
 
     final Expression projectionMappings = block.append("projectionMappings",
-        Expressions.constant(implementor.projectItemMap));
+        Expressions.constant(implementor.groupByItemMap));
 
     final Expression offset = block.append("offset", Expressions.constant(implementor.offset));
     final Expression fetch = block.append("fetch", Expressions.constant(implementor.fetch));

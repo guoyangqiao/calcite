@@ -16,6 +16,8 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -31,14 +33,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.util.ImmutableBitSet;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Implementation of
@@ -51,13 +46,15 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
       EnumSet.of(SqlKind.COUNT, SqlKind.MAX, SqlKind.MIN, SqlKind.AVG,
           SqlKind.SUM, SqlKind.ANY_VALUE);
 
-  /** Creates an ElasticsearchAggregate. */
+  /**
+   * Creates an ElasticsearchAggregate.
+   */
   ElasticsearchAggregate(RelOptCluster cluster,
-      RelTraitSet traitSet,
-      RelNode input,
-      ImmutableBitSet groupSet,
-      List<ImmutableBitSet> groupSets,
-      List<AggregateCall> aggCalls) throws InvalidRelException  {
+                         RelTraitSet traitSet,
+                         RelNode input,
+                         ImmutableBitSet groupSet,
+                         List<ImmutableBitSet> groupSets,
+                         List<AggregateCall> aggCalls) throws InvalidRelException {
     super(cluster, traitSet, input, groupSet, groupSets, aggCalls);
 
     assert getConvention() == input.getConvention();
@@ -67,7 +64,7 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
     for (AggregateCall aggCall : aggCalls) {
       if (aggCall.isDistinct() && !aggCall.isApproximate()) {
         final String message = String.format(Locale.ROOT, "Only approximate distinct "
-            + "aggregations are supported in Elastic (cardinality aggregation). Use %s function",
+                + "aggregations are supported in Elastic (cardinality aggregation). Use %s function",
             SqlStdOperatorTable.APPROX_COUNT_DISTINCT.getName());
         throw new InvalidRelException(message);
       }
@@ -82,26 +79,28 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
 
     if (getGroupType() != Group.SIMPLE) {
       final String message = String.format(Locale.ROOT, "Only %s grouping is supported. "
-              + "Yours is %s", Group.SIMPLE, getGroupType());
+          + "Yours is %s", Group.SIMPLE, getGroupType());
       throw new InvalidRelException(message);
     }
   }
 
-  @Deprecated // to be removed before 2.0
+  @Deprecated
+    // to be removed before 2.0
   ElasticsearchAggregate(RelOptCluster cluster,
-      RelTraitSet traitSet,
-      RelNode input,
-      boolean indicator,
-      ImmutableBitSet groupSet,
-      List<ImmutableBitSet> groupSets,
-      List<AggregateCall> aggCalls) throws InvalidRelException {
+                         RelTraitSet traitSet,
+                         RelNode input,
+                         boolean indicator,
+                         ImmutableBitSet groupSet,
+                         List<ImmutableBitSet> groupSets,
+                         List<AggregateCall> aggCalls) throws InvalidRelException {
     this(cluster, traitSet, input, groupSet, groupSets, aggCalls);
     checkIndicator(indicator);
   }
 
-  @Override public Aggregate copy(RelTraitSet traitSet, RelNode input,
-      ImmutableBitSet groupSet, List<ImmutableBitSet> groupSets,
-      List<AggregateCall> aggCalls) {
+  @Override
+  public Aggregate copy(RelTraitSet traitSet, RelNode input,
+                        ImmutableBitSet groupSet, List<ImmutableBitSet> groupSets,
+                        List<AggregateCall> aggCalls) {
     try {
       return new ElasticsearchAggregate(getCluster(), traitSet, input,
           groupSet, groupSets, aggCalls);
@@ -110,18 +109,29 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
     }
   }
 
-  @Override public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+  @Override
+  public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
     return super.computeSelfCost(planner, mq).multiplyBy(0.1);
   }
 
-  @Override public void implement(Implementor implementor) {
+  @Override
+  public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
     final List<String> inputFields = fieldNames(getInput().getRowType());
     for (int group : groupSet) {
       final String name = inputFields.get(group);
       implementor.addGroupBy(implementor.expressionItemMap.getOrDefault(name, name));
     }
-
+    ElasticsearchImplementContext relContext = implementor.relContext;
+    ConditionReduction.AnalyzePredicationCondition childrenAggregationCondition = relContext.analyzePredicationMap.get(ConditionReduction.CHILDREN_AGGREGATION);
+    if (childrenAggregationCondition.allMatched()) {
+      Object childType = childrenAggregationCondition.forCondition(ConditionReduction.AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION);
+      String childAggregation = "child_agg_" + childType;
+      implementor.addGroupBy(childAggregation);
+      ObjectNode aggNode = implementor.elasticsearchTable.mapper.createObjectNode();
+      aggNode.with("children").put("type", String.valueOf(childType));
+      implementor.groupByItemMap.put(childAggregation, aggNode.toString());
+    }
     final ObjectMapper mapper = implementor.elasticsearchTable.mapper;
 
     for (AggregateCall aggCall : aggCalls) {
@@ -152,21 +162,21 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
   private static String toElasticAggregate(AggregateCall call) {
     final SqlKind kind = call.getAggregation().getKind();
     switch (kind) {
-    case COUNT:
-      // approx_count_distinct() vs count()
-      return call.isDistinct() && call.isApproximate() ? "cardinality" : "value_count";
-    case SUM:
-      return "sum";
-    case MIN:
-      return "min";
-    case MAX:
-      return "max";
-    case AVG:
-      return "avg";
-    case ANY_VALUE:
-      return "terms";
-    default:
-      throw new IllegalArgumentException("Unknown aggregation kind " + kind + " for " + call);
+      case COUNT:
+        // approx_count_distinct() vs count()
+        return call.isDistinct() && call.isApproximate() ? "cardinality" : "value_count";
+      case SUM:
+        return "sum";
+      case MIN:
+        return "min";
+      case MAX:
+        return "max";
+      case AVG:
+        return "avg";
+      case ANY_VALUE:
+        return "terms";
+      default:
+        throw new IllegalArgumentException("Unknown aggregation kind " + kind + " for " + call);
     }
   }
 

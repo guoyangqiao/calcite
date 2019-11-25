@@ -77,7 +77,7 @@ public interface ElasticsearchRel extends RelNode {
     /**
      * Like {@link Implementor#expressionItemMap}, this field store projection field.
      */
-    final Map<String, String> projectItemMap = new LinkedHashMap<>();
+    final Map<String, String> groupByItemMap = new LinkedHashMap<>();
 
     /**
      * Starting index (default {@code 0}). Equivalent to {@code start} in ES query.
@@ -148,7 +148,7 @@ public interface ElasticsearchRel extends RelNode {
     ElasticsearchImplementContext() {
     }
 
-    EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> analyzePredicationMap = new EnumMap<>(AnalyzePredication.class);
+    EnumMap<ConditionReduction, ConditionReduction.AnalyzePredicationCondition> analyzePredicationMap = new EnumMap<>(ConditionReduction.class);
   }
 }
 

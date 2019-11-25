@@ -2,36 +2,44 @@ package org.apache.calcite.adapter.elasticsearch;
 
 import com.google.common.collect.Sets;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Tag which will decide the result of {@link PredicateAnalyzer.PromisedQueryExpression#builder()}
  */
-public enum AnalyzePredication {
+public enum ConditionReduction {
   CHILDREN_AGGREGATION(AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION, AnalyzePredicationConditionKey.ROOT_ID_SELECTION);
 
   private Object[] requiredConditions;
 
-  AnalyzePredication(Object... conditions) {
+  ConditionReduction(Object... conditions) {
     this.requiredConditions = conditions;
   }
 
   static class AnalyzePredicationCondition {
-    private final AnalyzePredication predication;
-    private Set<Object> conditions;
+    private final ConditionReduction predication;
+    private Map<Object, Object> conditions;
 
-    public AnalyzePredicationCondition(AnalyzePredication predication) {
+    AnalyzePredicationCondition(ConditionReduction predication) {
       this.predication = predication;
-      this.conditions = new HashSet<>();
+      this.conditions = new HashMap<>();
     }
 
-    public boolean add(Object cdnObj) {
-      return conditions.add(cdnObj);
+    public void add(Object cdnObj) {
+      add(cdnObj, null);
     }
 
-    public boolean allMatched() {
-      return conditions.containsAll(Sets.newHashSet(predication.requiredConditions));
+    public void add(Object cdnObj, Object val) {
+      conditions.put(cdnObj, val);
+    }
+
+    boolean allMatched() {
+      return conditions.keySet().containsAll(Sets.newHashSet(predication.requiredConditions));
+    }
+
+    Object forCondition(Object condition) {
+      return conditions.get(condition);
     }
   }
 
