@@ -223,7 +223,7 @@ class PredicateAnalyzer {
                   final ElasticsearchMapping.Datatype datatype = fieldMapping.get(fieldName);
                   if (datatype != null) {
                     final JsonNode properties = datatype.properties();
-                    if (JOIN_TYPE.equalsIgnoreCase(properties.get(TYPE_KEY).asText())) {
+                    if (isJoinType(properties)) {
                       final RelNode subQueryNode = RelCopyShuttle.copyOf(subQuery.rel);
                       if (subQueryNode.getRowType().getFieldList().size() == 1) {
                         final Project probeProject = firstClassInstance(Project.class, subQueryNode);
@@ -259,6 +259,15 @@ class PredicateAnalyzer {
         }
       }
       return null;
+    }
+
+    /**
+     * Whether field's data type is a JOIN type
+     *
+     * @param properties Properties belong to a certain field
+     */
+    private static boolean isJoinType(JsonNode properties) {
+      return JOIN_TYPE.equalsIgnoreCase(properties.get(TYPE_KEY).asText());
     }
 
     private ElasticsearchTable getElasticTable() {
@@ -311,9 +320,9 @@ class PredicateAnalyzer {
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
-                        final RexLiteral literal = testFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
+                        final RexLiteral literal = testHasChildFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
-                          final EnumerableRel enumerableRel = implSubquery(subQueryNode);
+                          final EnumerableRel enumerableRel = implHasChildSubquery(subQueryNode);
                           if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
                             RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
                             while (!(esRoot instanceof Filter)) {
@@ -361,17 +370,15 @@ class PredicateAnalyzer {
       public RexNode visitCall(RexCall call) {
         final SqlOperator operator = call.getOperator();
         if (operator.getKind() == SqlKind.EQUALS) {
-          final RexNode rexNode = call.getOperands().get(1);
-          if (rexNode instanceof RexLiteral) {
+          final RexNode typeLiteral = call.getOperands().get(1);
+          if (typeLiteral instanceof RexLiteral) {
             final RexNode inputRef = call.getOperands().get(0);
-            if (inputRef instanceof RexInputRef) {
-              final int index = ((RexInputRef) inputRef).getIndex();
-              final boolean derivedName = testJoinFieldAccess(index, NAME_FIELD, topNode, elasticsearchMapping);
-              if (derivedName) {
-                final String typeName = ((RexLiteral) rexNode).getValueAs(String.class);
+            if (inputRef instanceof RexFieldAccess) {
+              if (isTargetFieldAccess((RexFieldAccess) inputRef, NAME_FIELD, elasticsearchMapping)) {
+                final String typeName = ((RexLiteral) typeLiteral).getValueAs(String.class);
                 finish:
                 for (Map.Entry<String, ElasticsearchMapping.Datatype> x : elasticsearchMapping.mapping().entrySet()) {
-                  if (JOIN_TYPE.equalsIgnoreCase(x.getValue().properties().get(TYPE_KEY).asText())) {
+                  if (isJoinType(x.getValue().properties())) {
                     //Code below will be triggered once, cause one index can have at most one join type
                     final Map.Entry<String, JsonNode> relations = x.getValue().properties().get(RELATIONS_KEY).fields().next();
                     final String key = relations.getKey();
@@ -400,6 +407,32 @@ class PredicateAnalyzer {
     }
 
     /**
+     * Test if field access name equals given target field name
+     *
+     * @param fieldAccess          Source field access
+     * @param targetField          Target field name
+     * @param elasticsearchMapping Filed mapping info
+     */
+    private static boolean isTargetFieldAccess(RexFieldAccess fieldAccess, String targetField, ElasticsearchMapping elasticsearchMapping) {
+      RelDataTypeField field = fieldAccess.getField();
+      RexNode referenceExpr = fieldAccess.getReferenceExpr();
+      if (referenceExpr instanceof RexCall && SqlStdOperatorTable.CAST.equals(((RexCall) referenceExpr).getOperator())) {
+        RexNode node = ((RexCall) referenceExpr).getOperands().get(0);
+        if (node instanceof RexCall && SqlStdOperatorTable.ITEM.equals(((RexCall) node).getOperator())) {
+          RexNode node1 = ((RexCall) node).getOperands().get(1);
+          if (node1 instanceof RexLiteral) {
+            String valueAs = ((RexLiteral) node1).getValueAs(String.class);
+            ElasticsearchMapping.Datatype datatype = elasticsearchMapping.mapping().get(valueAs);
+            if (isJoinType(datatype.properties())) {
+              return field.getName().equalsIgnoreCase(targetField);
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    /**
      * copy relNode
      */
     static class RelCopyShuttle extends RelShuttleImpl {
@@ -419,7 +452,7 @@ class PredicateAnalyzer {
       }
     }
 
-    private EnumerableRel implSubquery(RelNode relNode) {
+    private EnumerableRel implHasChildSubquery(RelNode relNode) {
       final RelOptCluster cluster = relNode.getCluster();
       VolcanoPlanner planner = (VolcanoPlanner) cluster.getPlanner();
       planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
@@ -435,11 +468,11 @@ class PredicateAnalyzer {
      * @param subQueryNode query which will be used to test
      * @param mapping      use to see if the join type are ok, dammit!
      */
-    private RexLiteral testFilter(AtomicBoolean filterTest, final RelNode subQueryNode, ElasticsearchMapping mapping) {
+    private RexLiteral testHasChildFilter(AtomicBoolean filterTest, final RelNode subQueryNode, ElasticsearchMapping mapping) {
       final AtomicReference<RexLiteral> nameHolder = new AtomicReference<>();
       for (RelNode current = subQueryNode, previous = null; !(current instanceof TableScan); previous = current, current = current.getInput(0)) {
         if (current instanceof Filter) {
-          final RelNode refinedFilter = current.accept(getShuttle(filterTest, mapping, nameHolder, current));
+          final RelNode refinedFilter = current.accept(getHasChildEquationShuttle(filterTest, mapping, nameHolder, current));
           if (current != refinedFilter) {
             //ok we find the key, now we can return
             assert previous != null;
@@ -451,7 +484,7 @@ class PredicateAnalyzer {
       return nameHolder.get();
     }
 
-    private RexShuttle getShuttle(AtomicBoolean filterTest, ElasticsearchMapping
+    private RexShuttle getHasChildEquationShuttle(AtomicBoolean filterTest, ElasticsearchMapping
         mapping, AtomicReference<RexLiteral> nameHolder, RelNode finalProbeFilter) {
       return new RexShuttle() {
         @Override
