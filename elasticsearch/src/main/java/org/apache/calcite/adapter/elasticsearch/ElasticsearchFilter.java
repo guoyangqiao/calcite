@@ -16,7 +16,6 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
-import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
@@ -28,7 +27,6 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 
 import java.io.IOException;
-import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.util.Objects;
 
@@ -86,15 +84,9 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
      * @throws IOException                                        ignore
      * @throws PredicateAnalyzer.ExpressionNotAnalyzableException ignore
      */
-    String translateMatch(Filter filter, ElasticsearchImplementContext relContext) throws IOException,
+    QueryBuilders.QueryBuilder translateMatch(Filter filter, ElasticsearchImplementContext relContext) throws IOException,
         PredicateAnalyzer.ExpressionNotAnalyzableException {
-
-      StringWriter writer = new StringWriter();
-      JsonGenerator generator = mapper.getFactory().createGenerator(writer);
-      QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(filter.getCondition(), filter, relContext)).writeJson(generator);
-      generator.flush();
-      generator.close();
-      return "{\"query\" : " + writer.toString() + "}";
+      return QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(filter.getCondition(), filter, relContext));
     }
   }
 

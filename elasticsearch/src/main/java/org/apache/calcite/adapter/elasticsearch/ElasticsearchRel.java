@@ -42,7 +42,7 @@ public interface ElasticsearchRel extends RelNode {
    */
   class Implementor {
 
-    final List<String> list = new ArrayList<>();
+    final List<Object> list = new ArrayList<>();
 
     /**
      * Sorting clauses.
@@ -99,6 +99,10 @@ public interface ElasticsearchRel extends RelNode {
      * Context during elastic search query implementation
      */
     ElasticsearchImplementContext relContext = new ElasticsearchImplementContext();
+
+    void add(QueryBuilders.QueryBuilder findOp) {
+      list.add(findOp);
+    }
 
     void add(String findOp) {
       list.add(findOp);

@@ -225,13 +225,11 @@ class PredicateAnalyzer {
                               QueryBuilder queryBuilder;
                               final Filter filter = firstClassInstance(Filter.class, subQueryNode);
                               if (filter != null) {
-                                try {
-                                  ElasticsearchRel.ElasticsearchImplementContext implementContext = new ElasticsearchRel.ElasticsearchImplementContext();
-                                  //TODO do we need to use this rel context?
-                                  queryBuilder = PredicateAnalyzer.analyze(filter.getCondition(), filter, implementContext);
-                                } catch (ExpressionNotAnalyzableException e) {
-                                  throw new RuntimeException(e);
-                                }
+                                ElasticsearchRel.Implementor implementor = new ElasticsearchRel.Implementor();
+                                ((ElasticsearchFilter) filter).implement(implementor);
+                                List<Object> queryBuilders = implementor.list.stream().filter(x -> x instanceof QueryBuilder).collect(Collectors.toList());
+                                assert queryBuilders.size() == 1;
+                                queryBuilder = (QueryBuilder) queryBuilders.get(0);
                               } else {
                                 queryBuilder = QueryBuilders.matchAll();
                               }

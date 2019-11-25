@@ -16,6 +16,7 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import org.apache.calcite.adapter.enumerable.*;
 import org.apache.calcite.linq4j.tree.BlockBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
@@ -29,6 +30,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.util.BuiltInMethod;
 import org.apache.calcite.util.Pair;
 
+import java.io.StringWriter;
 import java.util.AbstractList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -74,7 +76,21 @@ public class ElasticsearchToEnumerableConverter extends ConverterImpl implements
     final Expression table = block.append("table",
         implementor.table
             .getExpression(ElasticsearchTable.ElasticsearchQueryable.class));
-    final Expression ops = block.append("ops", Expressions.constant(implementor.list));
+    final Expression ops = block.append("ops", Expressions.constant(implementor.list.stream().map(x -> {
+      if (x instanceof QueryBuilders.QueryBuilder) {
+        StringWriter writer = new StringWriter();
+        try {
+          JsonGenerator generator = implementor.elasticsearchTable.mapper.getFactory().createGenerator(writer);
+          ((QueryBuilders.QueryBuilder) x).writeJson(generator);
+          generator.flush();
+          generator.close();
+        } catch (Throwable t) {
+          throw new RuntimeException(t);
+        }
+        return "{\"query\" : " + writer.toString() + "}";
+      }
+      return x;
+    }).collect(Collectors.toList())));
     final Expression sort = block.append("sort", constantArrayList(implementor.sort, Pair.class));
     final Expression groupBy = block.append("groupBy", Expressions.constant(implementor.groupBy));
     final Expression aggregations = block.append("aggregations",
