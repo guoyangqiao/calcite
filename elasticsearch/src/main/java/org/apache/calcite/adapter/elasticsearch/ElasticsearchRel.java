@@ -98,7 +98,7 @@ public interface ElasticsearchRel extends RelNode {
     /**
      * Context during elastic search query implementation
      */
-    ElasticsearchImplementContext relContext;
+    ElasticsearchImplementContext relContext = new ElasticsearchImplementContext();
 
     void add(String findOp) {
       list.add(findOp);
@@ -145,6 +145,8 @@ public interface ElasticsearchRel extends RelNode {
    * Context used while calling {@link ElasticsearchRel#implement(Implementor)}
    */
   class ElasticsearchImplementContext {
+    ElasticsearchImplementContext() {
+    }
 
     EnumMap<AnalyzePredication, AnalyzePredication.AnalyzePredicationCondition> analyzePredicationMap = new EnumMap<>(AnalyzePredication.class);
   }
