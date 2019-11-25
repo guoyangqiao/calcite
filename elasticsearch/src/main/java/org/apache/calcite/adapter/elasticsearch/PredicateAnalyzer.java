@@ -851,7 +851,7 @@ class PredicateAnalyzer {
           call.accept(joinTypeEquationFinderShuttle);
           if (Boolean.FALSE.equals(joinTypeEquationFinderShuttle.parent) && joinTypeEquationFinderShuttle.joinType != null) {
             return new PromisedQueryExpression(predicationConditionMap).
-                promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredication.AnalyzePredicationConditionKey.childTypeJoinEquation, QueryBuilders.voidQuery()).
+                promised(AnalyzePredication.CHILDREN_AGGREGATION, AnalyzePredication.AnalyzePredicationConditionKey.ChildTypeJoinEquation, QueryBuilders.voidQuery()).
                 orElse(equals.builder());
           }
           return equals;
