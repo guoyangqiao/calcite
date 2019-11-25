@@ -117,13 +117,8 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
   @Override
   public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
-    final List<String> inputFields = fieldNames(getInput().getRowType());
-    for (int group : groupSet) {
-      final String name = inputFields.get(group);
-      implementor.addGroupBy(implementor.expressionItemMap.getOrDefault(name, name));
-    }
-    ElasticsearchImplementContext relContext = implementor.relContext;
-    ConditionReduction.AnalyzePredicationCondition childrenAggregationCondition = relContext.analyzePredicationMap.get(ConditionReduction.CHILDREN_AGGREGATION);
+    //If find children aggregation, add it before other all aggregations
+    ConditionReduction.AnalyzePredicationCondition childrenAggregationCondition = implementor.relContext.analyzePredicationMap.get(ConditionReduction.CHILDREN_AGGREGATION);
     if (childrenAggregationCondition.allMatched()) {
       Object childType = childrenAggregationCondition.forCondition(ConditionReduction.AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION);
       String childAggregation = "child_agg_" + childType;
@@ -132,6 +127,12 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
       aggNode.with("children").put("type", String.valueOf(childType));
       implementor.groupByItemMap.put(childAggregation, aggNode.toString());
     }
+    final List<String> inputFields = fieldNames(getInput().getRowType());
+    for (int group : groupSet) {
+      final String name = inputFields.get(group);
+      implementor.addGroupBy(implementor.expressionItemMap.getOrDefault(name, name));
+    }
+
     final ObjectMapper mapper = implementor.elasticsearchTable.mapper;
 
     for (AggregateCall aggCall : aggCalls) {
