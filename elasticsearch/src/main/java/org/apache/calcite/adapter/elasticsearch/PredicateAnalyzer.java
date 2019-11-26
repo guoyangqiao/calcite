@@ -225,8 +225,13 @@ class PredicateAnalyzer {
                               QueryBuilder queryBuilder;
                               final Filter filter = firstClassInstance(Filter.class, subQueryNode);
                               if (filter != null) {
+                                RelOptCluster cluster = filter.getCluster();
+                                RelOptPlanner planner = cluster.getPlanner();
+                                RelNode origin = planner.changeTraits(filter, cluster.traitSetOf(ElasticsearchRel.CONVENTION));
+                                planner.setRoot(origin);
+                                RelNode bestExp = planner.findBestExp();
                                 ElasticsearchRel.Implementor implementor = new ElasticsearchRel.Implementor();
-                                ((ElasticsearchFilter) filter).implement(implementor);
+                                ((ElasticsearchRel) bestExp).implement(implementor);
                                 List<Object> queryBuilders = implementor.list.stream().filter(x -> x instanceof QueryBuilder).collect(Collectors.toList());
                                 assert queryBuilders.size() == 1;
                                 queryBuilder = (QueryBuilder) queryBuilders.get(0);
