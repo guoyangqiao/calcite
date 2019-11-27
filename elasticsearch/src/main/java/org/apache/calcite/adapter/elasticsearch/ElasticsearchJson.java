@@ -703,7 +703,7 @@ final class ElasticsearchJson {
       if (nextGenerateBucket != null) {
         return parseAggregation(parser, nextGenerateBucket.getKey(), nextGenerateBucket.getValue());
       }
-      throw new IllegalArgumentException("Error while parsing deep level aggregations");
+      throw new IllegalArgumentException("Node should have one object node");
     }
 
     private static MultiValue parseValue(JsonParser parser, String name, ObjectNode node)
