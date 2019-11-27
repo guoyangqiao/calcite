@@ -681,7 +681,15 @@ final class ElasticsearchJson {
     private static Aggregation parseAggregation(JsonParser parser, String name, JsonNode value) throws JsonProcessingException {
       Aggregation agg = null;
       if (value.has("buckets")) {
-        agg = parseBuckets(parser, name, (ArrayNode) value.get("buckets"));
+        JsonNode buckets = value.get("buckets");
+        if (buckets instanceof ArrayNode) {
+          agg = parseArrayBuckets(parser, name, (ArrayNode) buckets);
+        } else if (buckets instanceof ObjectNode) {
+          //Probably Aggregations like Range Aggregation
+          agg = parseObjectBuckets(parser, name, (ObjectNode) buckets);
+        } else {
+          throw new IllegalArgumentException("Unsupported buckets type " + buckets.getClass().getName());
+        }
       } else if (!value.findPath("buckets").isMissingNode()) {
         //Modified by GYQ, resolve issue while parsing non-buckets aggregation
         agg = parseNonBucketsAggregation(parser, name, value);
@@ -690,6 +698,19 @@ final class ElasticsearchJson {
         agg = parseValue(parser, name, (ObjectNode) value);
       }
       return agg;
+    }
+
+    private static Aggregation parseObjectBuckets(JsonParser parser, String name, ObjectNode bucketsNode) throws JsonProcessingException {
+      List<Bucket> buckets = new ArrayList<>(Iterators.size(bucketsNode.fieldNames()));
+
+      for (Iterator<Map.Entry<String, JsonNode>> fields = bucketsNode.fields(); fields.hasNext(); ) {
+        Map.Entry<String, JsonNode> bucketEnt = fields.next();
+        JsonNode bucketNode = bucketEnt.getValue();
+        assert bucketNode instanceof ObjectNode;
+        ((ObjectNode) bucketNode).put("key", bucketEnt.getKey());
+        buckets.add(parseBucket(parser, name, (ObjectNode) bucketNode));
+      }
+      return new MultiBucketsAggregation(name, buckets);
     }
 
     /**
@@ -712,7 +733,7 @@ final class ElasticsearchJson {
       return new MultiValue(name, parser.getCodec().treeToValue(node, Map.class));
     }
 
-    private static Aggregation parseBuckets(JsonParser parser, String name, ArrayNode nodes)
+    private static Aggregation parseArrayBuckets(JsonParser parser, String name, ArrayNode nodes)
         throws JsonProcessingException {
 
       List<Bucket> buckets = new ArrayList<>(nodes.size());
@@ -740,7 +761,6 @@ final class ElasticsearchJson {
 
     private static Bucket parseBucket(JsonParser parser, String name, ObjectNode node)
         throws JsonProcessingException  {
-
       if (!node.has("key")) {
         throw new IllegalArgumentException("No 'key' attribute for " + node);
       }
