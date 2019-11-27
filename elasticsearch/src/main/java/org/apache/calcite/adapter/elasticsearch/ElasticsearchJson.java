@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterators;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -667,13 +668,7 @@ final class ElasticsearchJson {
         final String name = entry.getKey();
         final JsonNode value = entry.getValue();
 
-        Aggregation agg = null;
-        if (value.has("buckets")) {
-          agg = parseBuckets(parser, name, (ArrayNode) value.get("buckets"));
-        } else if (value.isObject() && !IGNORE_TOKENS.contains(name)) {
-          // leaf
-          agg = parseValue(parser, name, (ObjectNode) value);
-        }
+        Aggregation agg = parseAggregation(parser, name, value);
 
         if (agg != null) {
           aggregations.add(agg);
@@ -683,7 +678,33 @@ final class ElasticsearchJson {
       return new Aggregations(aggregations);
     }
 
+    private static Aggregation parseAggregation(JsonParser parser, String name, JsonNode value) throws JsonProcessingException {
+      Aggregation agg = null;
+      if (value.has("buckets")) {
+        agg = parseBuckets(parser, name, (ArrayNode) value.get("buckets"));
+      } else if (!value.findPath("buckets").isMissingNode()) {
+        //Modified by GYQ, resolve issue while parsing non-buckets aggregation
+        agg = parseNonBucketsAggregation(parser, name, value);
+      } else if (value.isObject() && !IGNORE_TOKENS.contains(name)) {
+        // leaf
+        agg = parseValue(parser, name, (ObjectNode) value);
+      }
+      return agg;
+    }
 
+    /**
+     * Aggregation such as Children Aggregation need this call
+     */
+    private static Aggregation parseNonBucketsAggregation(JsonParser parser, String name, JsonNode value) throws JsonProcessingException {
+      Map.Entry<String, JsonNode> nextGenerateBucket = Iterators.tryFind(value.fields(), c -> {
+        assert c != null;
+        return c.getValue() instanceof ObjectNode;
+      }).orNull();
+      if (nextGenerateBucket != null) {
+        return parseAggregation(parser, nextGenerateBucket.getKey(), nextGenerateBucket.getValue());
+      }
+      throw new IllegalArgumentException("Error while parsing deep level aggregations");
+    }
 
     private static MultiValue parseValue(JsonParser parser, String name, ObjectNode node)
         throws JsonProcessingException {
