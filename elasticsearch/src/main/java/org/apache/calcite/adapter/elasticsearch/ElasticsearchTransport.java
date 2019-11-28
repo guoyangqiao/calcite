@@ -210,8 +210,8 @@ final class ElasticsearchTransport {
         URIBuilder builder = new URIBuilder(path);
         httpParams.forEach(builder::addParameter);
         post = new HttpPost(builder.build());
-        final String json = mapper.writeValueAsString(query);
-        LOGGER.debug("Elasticsearch Query: {}", mapper.writerWithDefaultPrettyPrinter().writeValueAsString(query));
+        final String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(query);
+        LOGGER.debug("Elasticsearch Query: {}", json);
         post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
       } catch (URISyntaxException e) {
         throw new RuntimeException(e);
