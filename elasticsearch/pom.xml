@@ -54,8 +54,9 @@ limitations under the License.
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.calcite</groupId>
+      <groupId>com.shuyun.kunkka</groupId>
       <artifactId>calcite-core</artifactId>
+      <version>1.21.0-SNAPSHOT</version>
       <type>jar</type>
     </dependency>
     <dependency>
