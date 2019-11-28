@@ -41,6 +41,10 @@ public interface ElasticsearchRel extends RelNode {
    * {@link ElasticsearchRel} nodes into an Elasticsearch query.
    */
   class Implementor {
+    Implementor() {
+      final ConditionReduction.AnalyzePredicationCondition childAggregationPredictor = new ConditionReduction.AnalyzePredicationCondition(ConditionReduction.CHILDREN_AGGREGATION);
+      relContext.analyzePredicationMap.put(ConditionReduction.CHILDREN_AGGREGATION, childAggregationPredictor);
+    }
 
     final List<Object> list = new ArrayList<>();
 

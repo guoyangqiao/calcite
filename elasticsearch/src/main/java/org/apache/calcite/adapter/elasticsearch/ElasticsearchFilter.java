@@ -16,7 +16,6 @@
  */
 package org.apache.calcite.adapter.elasticsearch;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -25,10 +24,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
-
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.Objects;
 
 /**
  * Implementation of a {@link org.apache.calcite.rel.core.Filter}
@@ -55,12 +50,10 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
   @Override
   public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
-    ObjectMapper mapper = implementor.elasticsearchTable.mapper;
-    PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator(mapper);
+    PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator();
     try {
-      implementor.add(translator.translateMatch(this, implementor.relContext));
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
+      QueryBuilders.QueryBuilder filterBuilder = translator.translateMatch(this, implementor.relContext);
+      implementor.add(filterBuilder);
     } catch (PredicateAnalyzer.ExpressionNotAnalyzableException e) {
       throw new RuntimeException(e);
     }
@@ -71,21 +64,13 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
    * and allow to process more complex (boolean) predicates.
    */
   static class PredicateAnalyzerTranslator {
-    private final ObjectMapper mapper;
-
-    PredicateAnalyzerTranslator(final ObjectMapper mapper) {
-      this.mapper = Objects.requireNonNull(mapper, "mapper");
-    }
 
     /**
      * We need the node which expression belongs to and the node, so we use node as parameter
      *
      * @return Query string
-     * @throws IOException                                        ignore
-     * @throws PredicateAnalyzer.ExpressionNotAnalyzableException ignore
      */
-    QueryBuilders.QueryBuilder translateMatch(Filter filter, ElasticsearchImplementContext relContext) throws IOException,
-        PredicateAnalyzer.ExpressionNotAnalyzableException {
+    QueryBuilders.QueryBuilder translateMatch(Filter filter, ElasticsearchImplementContext relContext) throws PredicateAnalyzer.ExpressionNotAnalyzableException {
       return QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(filter.getCondition(), filter, relContext));
     }
   }

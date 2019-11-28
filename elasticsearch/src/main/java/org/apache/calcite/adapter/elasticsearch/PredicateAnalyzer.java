@@ -109,8 +109,7 @@ class PredicateAnalyzer {
    */
   static QueryBuilder analyze(RexNode expression, RelNode topNode, ElasticsearchRel.ElasticsearchImplementContext elasticsearchRelContext) throws ExpressionNotAnalyzableException {
     Objects.requireNonNull(expression, "expression");
-    final ConditionReduction.AnalyzePredicationCondition childAggregationPredictor = new ConditionReduction.AnalyzePredicationCondition(ConditionReduction.CHILDREN_AGGREGATION);
-    elasticsearchRelContext.analyzePredicationMap.put(ConditionReduction.CHILDREN_AGGREGATION, childAggregationPredictor);
+
     try {
       // visits expression tree
       QueryExpression e = (QueryExpression) expression.accept(new Visitor(topNode, elasticsearchRelContext.analyzePredicationMap));
