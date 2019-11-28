@@ -89,6 +89,7 @@ public class ElasticsearchProject extends Project implements ElasticsearchRel {
         //TODO If the query is not a aggregation, the case should fall into script_field which was currently not implemented
         //More information see https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-body.html#request-body-search-script-fields
         implementor.groupByItemMap.put(name, expr);
+        //TODO add script field to build function
       } else {
         scriptFields.add(ElasticsearchRules.quote(name)
             + ":{\"script\":"

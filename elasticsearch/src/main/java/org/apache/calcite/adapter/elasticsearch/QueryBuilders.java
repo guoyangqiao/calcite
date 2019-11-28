@@ -17,9 +17,11 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.calcite.util.Pair;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -251,6 +253,20 @@ class QueryBuilders {
      * @throws IOException if IO error occurred
      */
     abstract void writeJson(JsonGenerator generator) throws IOException;
+
+    @Override
+    public String toString() {
+      try {
+        StringWriter writer = new StringWriter();
+        JsonGenerator generator = new ObjectMapper().getFactory().createGenerator(writer).useDefaultPrettyPrinter();
+        writeJson(generator);
+        generator.flush();
+        generator.close();
+        return writer.toString();
+      } catch (Throwable t) {
+        throw new RuntimeException(t);
+      }
+    }
   }
 
   /**
