@@ -9,7 +9,8 @@ import java.util.Map;
  * Tag which will decide the result of {@link PredicateAnalyzer.PromisedQueryExpression#builder()}
  */
 public enum ConditionReduction {
-  CHILDREN_AGGREGATION(AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION, AnalyzePredicationConditionKey.ROOT_ID_SELECTION);
+  CHILDREN_AGGREGATION(AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION, AnalyzePredicationConditionKey.ROOT_ID_SELECTION),
+  HAS_CHILD();
 
   private Object[] requiredConditions;
 

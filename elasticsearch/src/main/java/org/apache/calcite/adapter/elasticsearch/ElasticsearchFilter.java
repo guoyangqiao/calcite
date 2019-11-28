@@ -50,31 +50,13 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRel {
   @Override
   public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
-    PredicateAnalyzerTranslator translator = new PredicateAnalyzerTranslator();
     try {
-      QueryBuilders.QueryBuilder filterBuilder = translator.translateMatch(this, implementor.relContext);
-      implementor.add(filterBuilder);
+      QueryBuilders.ConstantScoreQueryBuilder filterQuery = QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(this.getCondition(), this, implementor.relContext));
+      implementor.add(filterQuery);
     } catch (PredicateAnalyzer.ExpressionNotAnalyzableException e) {
       throw new RuntimeException(e);
     }
   }
-
-  /**
-   * New version of translator which uses visitor pattern
-   * and allow to process more complex (boolean) predicates.
-   */
-  static class PredicateAnalyzerTranslator {
-
-    /**
-     * We need the node which expression belongs to and the node, so we use node as parameter
-     *
-     * @return Query string
-     */
-    QueryBuilders.QueryBuilder translateMatch(Filter filter, ElasticsearchImplementContext relContext) throws PredicateAnalyzer.ExpressionNotAnalyzableException {
-      return QueryBuilders.constantScoreQuery(PredicateAnalyzer.analyze(filter.getCondition(), filter, relContext));
-    }
-  }
-
 }
 
 // End ElasticsearchFilter.java

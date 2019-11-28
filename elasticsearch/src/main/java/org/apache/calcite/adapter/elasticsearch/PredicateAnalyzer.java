@@ -24,11 +24,10 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.BoolQueryBuilder;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.QueryBuilder;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.RangeQueryBuilder;
-import org.apache.calcite.adapter.enumerable.EnumerableConvention;
-import org.apache.calcite.adapter.enumerable.EnumerableRel;
-import org.apache.calcite.plan.*;
-import org.apache.calcite.plan.volcano.VolcanoPlanner;
-import org.apache.calcite.rel.RelCollationTraitDef;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.Filter;
@@ -224,13 +223,8 @@ class PredicateAnalyzer {
                               QueryBuilder queryBuilder;
                               final Filter filter = firstClassInstance(Filter.class, subQueryNode);
                               if (filter != null) {
-                                RelOptCluster cluster = filter.getCluster();
-                                RelOptPlanner planner = cluster.getPlanner();
-                                RelNode origin = planner.changeTraits(filter, cluster.traitSetOf(ElasticsearchRel.CONVENTION));
-                                planner.setRoot(origin);
-                                RelNode bestExp = planner.findBestExp();
-                                ElasticsearchRel.Implementor implementor = new ElasticsearchRel.Implementor();
-                                ((ElasticsearchRel) bestExp).implement(implementor);
+                                RelNode bestExp = implElasticsearchRel(filter);
+                                ElasticsearchRel.Implementor implementor = implementRel((ElasticsearchRel) bestExp);
                                 List<Object> queryBuilders = implementor.list.stream().filter(x -> x instanceof QueryBuilder).collect(Collectors.toList());
                                 assert queryBuilders.size() == 1;
                                 queryBuilder = (QueryBuilder) queryBuilders.get(0);
@@ -304,32 +298,26 @@ class PredicateAnalyzer {
               if (relOptTables.size() == 1) {
                 final ElasticsearchTable elasticsearchTable = getElasticTable();
                 if (elasticsearchTable != null) {
-                  final RelNode subQueryNode = RelCopyShuttle.copyOf(subQuery.rel);
-                  if (subQueryNode.getRowType().getFieldList().size() == 1) {
+                  final RelNode query = RelCopyShuttle.copyOf(subQuery.rel);
+                  if (query.getRowType().getFieldList().size() == 1) {
                     RelNode probeProject;
-                    for (probeProject = subQueryNode; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
+                    for (probeProject = query; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
                       //ignore
                     }
                     if (probeProject instanceof Project) {
                       testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
                       if (projectionTest.get()) {
-                        final RexLiteral literal = testHasChildFilter(filterTest, subQueryNode, elasticsearchTable.transport.mapping);
+                        final RexLiteral literal = testHasChildFilter(filterTest, query, elasticsearchTable.transport.mapping);
                         if (filterTest.get()) {
-                          final EnumerableRel enumerableRel = implHasChildSubquery(subQueryNode);
-                          if (enumerableRel instanceof ElasticsearchToEnumerableConverter) {
-                            RelNode esRoot = ((ElasticsearchToEnumerableConverter) enumerableRel).getInput();
-                            while (!(esRoot instanceof Filter)) {
-                              //only use the first filter
-                              esRoot = esRoot.getInput(0);
-                            }
-                            if (esRoot instanceof ElasticsearchFilter) {
-                              final RexNode condition = ((ElasticsearchFilter) esRoot).getCondition();
-                              final Expression accept = condition.accept(this);
-                              if (accept instanceof QueryExpression) {
-                                return new SimpleQueryExpression(null).hasChild((LiteralExpression) literal.accept(this), (QueryExpression) accept);
-                              }
+                          final RelNode imp = implElasticsearchRel(query);
+                          Filter filter = firstClassInstance(Filter.class, imp);
+                          if (filter != null) {
+                            ElasticsearchRel.Implementor implementor = implementRel((ElasticsearchRel) imp);
+                            QueryBuilder subQueryBuilder = implementor.firstQuery();
+                            if (subQueryBuilder != null) {
+                              return new PromisedQueryExpression(predicationConditionMap).orElse(new SimpleQueryExpression(null).hasChild((LiteralExpression) literal.accept(this), subQueryBuilder).builder());
                             } else {
-                              throw new PredicateAnalyzerException("Unsupported match all has child query");
+                              throw new IllegalArgumentException("Unexpected subquery implementation");
                             }
                           }
                         }
@@ -350,13 +338,11 @@ class PredicateAnalyzer {
      */
     static class JoinTypeEquationFinderShuttle extends RexShuttle {
       private final ElasticsearchMapping elasticsearchMapping;
-      private final RelNode topNode;
       String joinType = null;
       Boolean parent = null;
 
-      private JoinTypeEquationFinderShuttle(ElasticsearchMapping elasticsearchMapping, RelNode topNode) {
+      private JoinTypeEquationFinderShuttle(ElasticsearchMapping elasticsearchMapping) {
         this.elasticsearchMapping = elasticsearchMapping;
-        this.topNode = topNode;
       }
 
       @Override
@@ -445,15 +431,12 @@ class PredicateAnalyzer {
       }
     }
 
-    private EnumerableRel implHasChildSubquery(RelNode relNode) {
-      final RelOptCluster cluster = relNode.getCluster();
-      VolcanoPlanner planner = (VolcanoPlanner) cluster.getPlanner();
-      planner.addRelTraitDef(ConventionTraitDef.INSTANCE);
-      planner.addRelTraitDef(RelCollationTraitDef.INSTANCE);
-      RelTraitSet desiredTraits = cluster.traitSet().replace(EnumerableConvention.INSTANCE);
-      final RelNode newRoot = planner.changeTraits(relNode, desiredTraits);
-      planner.setRoot(newRoot);
-      return (EnumerableRel) planner.findBestExp();
+    private RelNode implElasticsearchRel(RelNode relNode) {
+      RelOptCluster cluster = relNode.getCluster();
+      RelOptPlanner planner = cluster.getPlanner();
+      RelNode origin = planner.changeTraits(relNode, cluster.traitSetOf(ElasticsearchRel.CONVENTION));
+      planner.setRoot(origin);
+      return planner.findBestExp();
     }
 
     /**
@@ -840,7 +823,7 @@ class PredicateAnalyzer {
 //          throw new UnsupportedOperationException("LIKE not yet supported");
         case EQUALS: {
           final QueryExpression equals = QueryExpression.create(pair.getKey()).equals(pair.getValue());
-          JoinTypeEquationFinderShuttle joinTypeEquationFinderShuttle = new JoinTypeEquationFinderShuttle(getElasticTable().transport.mapping, topNode);
+          JoinTypeEquationFinderShuttle joinTypeEquationFinderShuttle = new JoinTypeEquationFinderShuttle(getElasticTable().transport.mapping);
           call.accept(joinTypeEquationFinderShuttle);
           if (Boolean.FALSE.equals(joinTypeEquationFinderShuttle.parent) && joinTypeEquationFinderShuttle.joinType != null) {
             return new PromisedQueryExpression(predicationConditionMap).
@@ -1026,6 +1009,12 @@ class PredicateAnalyzer {
     }
   }
 
+  private static ElasticsearchRel.Implementor implementRel(ElasticsearchRel bestExp) {
+    ElasticsearchRel.Implementor implementor = new ElasticsearchRel.Implementor();
+    bestExp.implement(implementor);
+    return implementor;
+  }
+
   /**
    * Empty interface; exists only to define type hierarchy
    */
@@ -1048,7 +1037,7 @@ class PredicateAnalyzer {
      * @param query query
      * @return
      */
-    public abstract QueryExpression hasChild(LiteralExpression name, QueryExpression query);
+    public abstract QueryExpression hasChild(LiteralExpression name, QueryBuilder query);
 
     public abstract QueryExpression range(List<Pair<Pair<LiteralExpression, LiteralExpression>, LiteralExpression>> rangeList);
 
@@ -1188,7 +1177,7 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression hasChild(LiteralExpression rexLiteral, QueryExpression accept) {
+    public QueryExpression hasChild(LiteralExpression rexLiteral, QueryBuilder accept) {
       throw new PredicateAnalyzerException("Query semantic ['hasChild'] "
           + "cannot be applied to a compound expression");
     }
@@ -1312,9 +1301,9 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression hasChild(LiteralExpression literalExpression, QueryExpression childQuery) {
+    public QueryExpression hasChild(LiteralExpression literalExpression, QueryBuilder childQuery) {
       assert builder == null;
-      builder = QueryBuilders.hasChild(literalExpression.stringValue(), QueryBuilders.constantScoreQuery(childQuery.builder()));
+      builder = QueryBuilders.hasChild(literalExpression.stringValue(), childQuery);
       return this;
     }
 

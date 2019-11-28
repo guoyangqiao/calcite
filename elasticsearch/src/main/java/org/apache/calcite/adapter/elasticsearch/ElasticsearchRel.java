@@ -147,6 +147,10 @@ public interface ElasticsearchRel extends RelNode {
       ((ElasticsearchRel) input).implement(this);
     }
 
+    QueryBuilders.QueryBuilder firstQuery() {
+      return (QueryBuilders.QueryBuilder) list.stream().filter(x -> x instanceof QueryBuilders.QueryBuilder).findFirst().orElse(null);
+    }
+
   }
 
   /**
