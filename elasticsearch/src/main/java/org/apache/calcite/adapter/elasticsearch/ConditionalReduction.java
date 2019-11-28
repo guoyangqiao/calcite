@@ -8,21 +8,21 @@ import java.util.Map;
 /**
  * Tag which will decide the result of {@link PredicateAnalyzer.PromisedQueryExpression#builder()}
  */
-public enum ConditionReduction {
-  CHILDREN_AGGREGATION(AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION, AnalyzePredicationConditionKey.ROOT_ID_SELECTION),
+public enum ConditionalReduction {
+  CHILDREN_AGGREGATION(ConditionKey.CHILD_TYPE_JOIN_EQUATION, ConditionKey.ROOT_ID_SELECTION),
   HAS_CHILD();
 
   private Object[] requiredConditions;
 
-  ConditionReduction(Object... conditions) {
+  ConditionalReduction(Object... conditions) {
     this.requiredConditions = conditions;
   }
 
-  static class AnalyzePredicationCondition {
-    private final ConditionReduction predication;
+  static class ConditionCollector {
+    private final ConditionalReduction predication;
     private Map<Object, Object> conditions;
 
-    AnalyzePredicationCondition(ConditionReduction predication) {
+    ConditionCollector(ConditionalReduction predication) {
       this.predication = predication;
       this.conditions = new HashMap<>();
     }
@@ -45,7 +45,7 @@ public enum ConditionReduction {
   }
 
 
-  static class AnalyzePredicationConditionKey {
+  static class ConditionKey {
     final static String CHILD_TYPE_JOIN_EQUATION = "childTypeJoinEquation";
     final static String ROOT_ID_SELECTION = "rootIdSelection";
   }

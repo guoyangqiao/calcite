@@ -118,9 +118,9 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
   public void implement(Implementor implementor) {
     implementor.visitChild(0, getInput());
     //If find children aggregation, add it before other all aggregations
-    ConditionReduction.AnalyzePredicationCondition childrenAggregationCondition = implementor.relContext.analyzePredicationMap.get(ConditionReduction.CHILDREN_AGGREGATION);
+    ConditionalReduction.ConditionCollector childrenAggregationCondition = implementor.relContext.analyzePredicationMap.get(ConditionalReduction.CHILDREN_AGGREGATION);
     if (childrenAggregationCondition.allMatched()) {
-      Object childType = childrenAggregationCondition.forCondition(ConditionReduction.AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION);
+      Object childType = childrenAggregationCondition.forCondition(ConditionalReduction.ConditionKey.CHILD_TYPE_JOIN_EQUATION);
       String childAggregation = "child_agg_" + childType;
       implementor.addGroupBy(childAggregation);
       ObjectNode aggNode = implementor.elasticsearchTable.mapper.createObjectNode();

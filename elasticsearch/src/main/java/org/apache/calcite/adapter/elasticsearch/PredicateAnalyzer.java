@@ -100,10 +100,9 @@ class PredicateAnalyzer {
    * <p>Callers should catch ExpressionNotAnalyzableException
    * and fall back to not using push-down filters.
    *
-   * @param expression              expression will be analyzed
-   * @param topNode                 node which the expression's belongs to, usually the filter itself, could be null
-   * @param elasticsearchRelContext
-   * @return search query which can be used to query ES cluster
+   * @param expression expression will be analyzed
+   * @param topNode    node which the expression's belongs to, usually the filter itself, could be null
+   * @return search query which canL be used to query ES cluster
    * @throws ExpressionNotAnalyzableException when expression can't processed by this analyzer
    */
   static QueryBuilder analyze(RexNode expression, RelNode topNode, ElasticsearchRel.ElasticsearchImplementContext elasticsearchRelContext) throws ExpressionNotAnalyzableException {
@@ -111,7 +110,7 @@ class PredicateAnalyzer {
 
     try {
       // visits expression tree
-      QueryExpression e = (QueryExpression) expression.accept(new Visitor(topNode, elasticsearchRelContext.analyzePredicationMap));
+      QueryExpression e = (QueryExpression) expression.accept(new Visitor(RelOptUtil.findAllTables(topNode), elasticsearchRelContext.analyzePredicationMap));
 
       if (e != null && e.isPartial()) {
         throw new UnsupportedOperationException("Can't handle partial QueryExpression: " + e);
@@ -161,14 +160,12 @@ class PredicateAnalyzer {
     static final String ID = "ID";
     static final String TYPE_KEY = "type";
     static final String RELATIONS_KEY = "relations";
-    private final RelNode topNode;
     private final ImmutableList<RelOptTable> relOptTables;
-    private final EnumMap<ConditionReduction, ConditionReduction.AnalyzePredicationCondition> predicationConditionMap;
+    private final EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> predicationConditionMap;
 
-    private Visitor(RelNode topNode, EnumMap<ConditionReduction, ConditionReduction.AnalyzePredicationCondition> analyzePredicationMap) {
+    private Visitor(List<RelOptTable> relOptTables, EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> analyzePredicationMap) {
       super(true);
-      this.topNode = topNode;
-      this.relOptTables = ImmutableList.copyOf(RelOptUtil.findAllTables(topNode));
+      this.relOptTables = ImmutableList.copyOf(relOptTables);
       this.predicationConditionMap = analyzePredicationMap;
     }
 
@@ -231,7 +228,7 @@ class PredicateAnalyzer {
                               } else {
                                 queryBuilder = QueryBuilders.matchAll();
                               }
-                              return new PromisedQueryExpression(predicationConditionMap).promised(ConditionReduction.CHILDREN_AGGREGATION, ConditionReduction.AnalyzePredicationConditionKey.ROOT_ID_SELECTION, null, queryBuilder).orElse(null);
+                              return new PromisedQueryExpression(predicationConditionMap).promised(ConditionalReduction.CHILDREN_AGGREGATION, ConditionalReduction.ConditionKey.ROOT_ID_SELECTION, null, queryBuilder).orElse(null);
                             }
                           }
                         }
@@ -827,7 +824,7 @@ class PredicateAnalyzer {
           call.accept(joinTypeEquationFinderShuttle);
           if (Boolean.FALSE.equals(joinTypeEquationFinderShuttle.parent) && joinTypeEquationFinderShuttle.joinType != null) {
             return new PromisedQueryExpression(predicationConditionMap).
-                promised(ConditionReduction.CHILDREN_AGGREGATION, ConditionReduction.AnalyzePredicationConditionKey.CHILD_TYPE_JOIN_EQUATION, joinTypeEquationFinderShuttle.joinType, QueryBuilders.voidQuery()).
+                promised(ConditionalReduction.CHILDREN_AGGREGATION, ConditionalReduction.ConditionKey.CHILD_TYPE_JOIN_EQUATION, joinTypeEquationFinderShuttle.joinType, QueryBuilders.voidQuery()).
                 orElse(equals.builder());
           }
           return equals;
@@ -1091,26 +1088,26 @@ class PredicateAnalyzer {
   static class PromisedQueryExpression extends SimpleQueryExpression {
 
     private QueryBuilder orElse;
-    private final EnumMap<ConditionReduction, QueryBuilder> ifPromised;
-    private final EnumMap<ConditionReduction, ConditionReduction.AnalyzePredicationCondition> predicationConditionMap;
+    private final EnumMap<ConditionalReduction, QueryBuilder> ifPromised;
+    private final EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> predicationConditionMap;
 
 
-    public PromisedQueryExpression(EnumMap<ConditionReduction, ConditionReduction.AnalyzePredicationCondition> predicationConditionMap) {
+    PromisedQueryExpression(EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> predicationConditionMap) {
       super(null);
-      this.ifPromised = new EnumMap<>(ConditionReduction.class);
       this.predicationConditionMap = predicationConditionMap;
+      this.ifPromised = new EnumMap<>(ConditionalReduction.class);
     }
 
-    public PromisedQueryExpression promised(ConditionReduction predication, Object condition, Object conditionVal, QueryBuilder queryBuilder) {
+    PromisedQueryExpression promised(ConditionalReduction predication, Object condition, Object conditionVal, QueryBuilder queryBuilder) {
       ifPromised.put(predication, queryBuilder);
-      ConditionReduction.AnalyzePredicationCondition analyzePredicationCondition = predicationConditionMap.get(predication);
+      ConditionalReduction.ConditionCollector analyzePredicationCondition = predicationConditionMap.get(predication);
       if (analyzePredicationCondition != null) {
         analyzePredicationCondition.add(condition, conditionVal);
       }
       return this;
     }
 
-    public PromisedQueryExpression orElse(QueryBuilder orElse) {
+    PromisedQueryExpression orElse(QueryBuilder orElse) {
       this.orElse = orElse;
       return this;
     }
@@ -1118,8 +1115,8 @@ class PredicateAnalyzer {
     @Override
     public QueryBuilder builder() {
       return new QueryBuilders.DelayedQueryBuilder(() -> {
-        for (Map.Entry<ConditionReduction, QueryBuilder> analyzePredicationConsumerEntry : ifPromised.entrySet()) {
-          ConditionReduction.AnalyzePredicationCondition analyzePredicationCondition = predicationConditionMap.get(analyzePredicationConsumerEntry.getKey());
+        for (Map.Entry<ConditionalReduction, QueryBuilder> analyzePredicationConsumerEntry : ifPromised.entrySet()) {
+          ConditionalReduction.ConditionCollector analyzePredicationCondition = predicationConditionMap.get(analyzePredicationConsumerEntry.getKey());
           if (analyzePredicationCondition.allMatched()) {
             return analyzePredicationConsumerEntry.getValue();
           }

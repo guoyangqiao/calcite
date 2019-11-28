@@ -42,8 +42,8 @@ public interface ElasticsearchRel extends RelNode {
    */
   class Implementor {
     Implementor() {
-      final ConditionReduction.AnalyzePredicationCondition childAggregationPredictor = new ConditionReduction.AnalyzePredicationCondition(ConditionReduction.CHILDREN_AGGREGATION);
-      relContext.analyzePredicationMap.put(ConditionReduction.CHILDREN_AGGREGATION, childAggregationPredictor);
+      final ConditionalReduction.ConditionCollector childAggregationPredictor = new ConditionalReduction.ConditionCollector(ConditionalReduction.CHILDREN_AGGREGATION);
+      relContext.analyzePredicationMap.put(ConditionalReduction.CHILDREN_AGGREGATION, childAggregationPredictor);
     }
 
     final List<Object> list = new ArrayList<>();
@@ -160,7 +160,7 @@ public interface ElasticsearchRel extends RelNode {
     ElasticsearchImplementContext() {
     }
 
-    EnumMap<ConditionReduction, ConditionReduction.AnalyzePredicationCondition> analyzePredicationMap = new EnumMap<>(ConditionReduction.class);
+    EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> analyzePredicationMap = new EnumMap<>(ConditionalReduction.class);
   }
 }
 
