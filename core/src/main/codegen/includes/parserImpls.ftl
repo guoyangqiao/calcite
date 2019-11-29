@@ -15,23 +15,6 @@
 // limitations under the License.
 -->
 
-<#--
-  Add implementations of additional parser statements, literals or
-  data types.
-
-  Example of SqlShowTables() implementation:
-  SqlNode SqlShowTables()
-  {
-    ...local variables...
-  }
-  {
-    <SHOW> <TABLES>
-    ...
-    {
-      return SqlShowTables(...)
-    }
-  }
--->
 
 SqlCall DateAddFunctionCall() :
 {
@@ -55,5 +38,4 @@ List<SqlNode> args;
                         return SqlStdOperatorTable.DATE_ADD.createCall(
                         s.end(this), args);
                         }
-                        }
-
+}
