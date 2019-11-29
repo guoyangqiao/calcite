@@ -40,7 +40,7 @@ public class SqlStdOperatorTable extends ReflectiveSqlOperatorTable {
   /**
    * The standard operator table.
    */
-  private static SqlStdOperatorTable instance;k
+  private static SqlStdOperatorTable instance;
 
   //-------------------------------------------------------------k
   //                   SET OPERATORS
