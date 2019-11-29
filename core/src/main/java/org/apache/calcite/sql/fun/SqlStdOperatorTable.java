@@ -277,20 +277,6 @@ public class SqlStdOperatorTable extends ReflectiveSqlOperatorTable {
           OperandTypes.COMPARABLE_UNORDERED_COMPARABLE_UNORDERED);
 
   /**
-   * Regex expression match
-   */
-  public static final SqlBinaryOperator REGEXP =
-      new SqlBinaryOperator(
-          "REGEXP",
-          SqlKind.OTHER,
-          30,
-          true,
-          ReturnTypes.BOOLEAN_NULLABLE,
-          InferTypes.FIRST_KNOWN,
-          OperandTypes.ANY_ANY);
-
-
-  /**
    * Logical greater-than operator, '<code>&gt;</code>'.
    */
   public static final SqlBinaryOperator GREATER_THAN =
