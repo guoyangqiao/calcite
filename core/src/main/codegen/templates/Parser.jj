@@ -6118,7 +6118,6 @@ SqlBinaryOperator BinaryRowOperator() :
 {
     // <IN> is handled as a special case
     <EQ> { return SqlStdOperatorTable.EQUALS; }
-|   <REGEXP> { return SqlStdOperatorTable.REGEXP; }
 |   <GT> { return SqlStdOperatorTable.GREATER_THAN; }
 |   <LT> { return SqlStdOperatorTable.LESS_THAN; }
 |   <LE> { return SqlStdOperatorTable.LESS_THAN_OR_EQUAL; }
