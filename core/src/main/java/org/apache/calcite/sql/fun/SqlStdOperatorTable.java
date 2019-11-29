@@ -40,9 +40,9 @@ public class SqlStdOperatorTable extends ReflectiveSqlOperatorTable {
   /**
    * The standard operator table.
    */
-  private static SqlStdOperatorTable instance;
+  private static SqlStdOperatorTable instance;k
 
-  //-------------------------------------------------------------
+  //-------------------------------------------------------------k
   //                   SET OPERATORS
   //-------------------------------------------------------------
   // The set operators can be compared to the arithmetic operators
