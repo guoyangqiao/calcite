@@ -16,6 +16,13 @@
  */
 package org.apache.calcite.rel.type;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Interner;
+import com.google.common.collect.Interners;
 import org.apache.calcite.linq4j.tree.Primitive;
 import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.type.JavaToSqlTypeConversionRules;
@@ -24,25 +31,13 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.util.Util;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Interner;
-import com.google.common.collect.Interners;
-
+import javax.annotation.Nonnull;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.charset.Charset;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.util.AbstractList;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import javax.annotation.Nonnull;
+import java.util.*;
 
 /**
  * Abstract base for implementations of {@link RelDataTypeFactory}.
@@ -52,16 +47,19 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
 
   /**
    * Global cache for Key to RelDataType. Uses soft values to allow GC.
+   * Modified by GYQ 2019-12-05 14:08:59. Remove <code>static</code> modifier to avoid unstable behavior while using {@link DynamicRecordType}
    */
-  private static final LoadingCache<Key, RelDataType> KEY2TYPE_CACHE =
+  private final LoadingCache<Key, RelDataType> KEY2TYPE_CACHE =
       CacheBuilder.newBuilder()
           .softValues()
           .build(CacheLoader.from(RelDataTypeFactoryImpl::keyToType));
 
   /**
    * Global cache for RelDataType.
+   * Modified by GYQ 2019-12-05 14:10:28. Remove <code>static</code> modifier to avoid unstable behavior while using {@link DynamicRecordType}
    */
-  private static final Interner<RelDataType> DATATYPE_CACHE =
+  @SuppressWarnings("UnstableApiUsage")
+  private final Interner<RelDataType> DATATYPE_CACHE =
       Interners.newWeakInterner();
 
   private static RelDataType keyToType(@Nonnull Key key) {
