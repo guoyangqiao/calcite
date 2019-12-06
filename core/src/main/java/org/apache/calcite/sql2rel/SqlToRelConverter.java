@@ -5670,7 +5670,6 @@ public class SqlToRelConverter {
       return expand;
     }
 
-    @Override
     public boolean isFlattenTypes() {
       return flattenTypes;
     }
