@@ -330,10 +330,14 @@ public class SqlToRelConverter {
   public RelNode flattenTypes(
       RelNode rootRel,
       boolean restructure) {
-    RelStructuredTypeFlattener typeFlattener =
-        new RelStructuredTypeFlattener(relBuilder,
-            rexBuilder, createToRelContext(), restructure);
-    return typeFlattener.rewrite(rootRel);
+    if (config.isFlattenTypes()) {
+      RelStructuredTypeFlattener typeFlattener =
+          new RelStructuredTypeFlattener(relBuilder,
+              rexBuilder, createToRelContext(), restructure);
+      return typeFlattener.rewrite(rootRel);
+    } else {
+      return rootRel;
+    }
   }
 
   /**
@@ -5507,6 +5511,11 @@ public class SqlToRelConverter {
      * {@link org.apache.calcite.rex.RexSubQuery}. */
     boolean isExpand();
 
+    /**
+     * Returns the {@code flattenTypes} option. Controls whether to flatten
+     * structured field types.*/
+    boolean isFlattenTypes();
+
     /** Returns the {@code inSubQueryThreshold} option,
      * default {@link #DEFAULT_IN_SUB_QUERY_THRESHOLD}. Controls the list size
      * threshold under which {@link #convertInToOr} is used. Lists of this size
@@ -5530,6 +5539,7 @@ public class SqlToRelConverter {
     private boolean createValuesRel = true;
     private boolean explain;
     private boolean expand = true;
+    private boolean flattenTypes = true;
     private int inSubQueryThreshold = DEFAULT_IN_SUB_QUERY_THRESHOLD;
     private RelBuilderFactory relBuilderFactory = RelFactories.LOGICAL_BUILDER;
 
@@ -5578,6 +5588,11 @@ public class SqlToRelConverter {
       return this;
     }
 
+    public ConfigBuilder withFlattenTypes(boolean flattenTypes) {
+      this.flattenTypes = flattenTypes;
+      return this;
+    }
+
     @Deprecated // to be removed before 2.0
     public ConfigBuilder withInSubqueryThreshold(int inSubQueryThreshold) {
       return withInSubQueryThreshold(inSubQueryThreshold);
@@ -5597,7 +5612,7 @@ public class SqlToRelConverter {
     /** Builds a {@link Config}. */
     public Config build() {
       return new ConfigImpl(convertTableAccess, decorrelationEnabled,
-          trimUnusedFields, createValuesRel, explain, expand,
+          trimUnusedFields, createValuesRel, explain, expand, flattenTypes,
           inSubQueryThreshold, relBuilderFactory);
     }
   }
@@ -5611,12 +5626,13 @@ public class SqlToRelConverter {
     private final boolean createValuesRel;
     private final boolean explain;
     private final boolean expand;
+    private final boolean flattenTypes;
     private final int inSubQueryThreshold;
     private final RelBuilderFactory relBuilderFactory;
 
     private ConfigImpl(boolean convertTableAccess, boolean decorrelationEnabled,
         boolean trimUnusedFields, boolean createValuesRel, boolean explain,
-        boolean expand, int inSubQueryThreshold,
+        boolean expand, boolean flattenTypes, int inSubQueryThreshold,
         RelBuilderFactory relBuilderFactory) {
       this.convertTableAccess = convertTableAccess;
       this.decorrelationEnabled = decorrelationEnabled;
@@ -5624,6 +5640,7 @@ public class SqlToRelConverter {
       this.createValuesRel = createValuesRel;
       this.explain = explain;
       this.expand = expand;
+      this.flattenTypes = flattenTypes;
       this.inSubQueryThreshold = inSubQueryThreshold;
       this.relBuilderFactory = relBuilderFactory;
     }
@@ -5650,6 +5667,11 @@ public class SqlToRelConverter {
 
     public boolean isExpand() {
       return expand;
+    }
+
+    @Override
+    public boolean isFlattenTypes() {
+      return flattenTypes;
     }
 
     public int getInSubQueryThreshold() {
