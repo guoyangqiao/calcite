@@ -18,10 +18,12 @@ public class DynamicFieldType extends RelDataTypeImpl {
 
   public void switchToRelay() {
     this.delegate = relayType;
+    computeDigest();
   }
 
   void switchToEndPoint() {
     this.delegate = endPointType;
+    computeDigest();
   }
 
   DynamicFieldType(DynamicRecordType relayType, RelDataType endPointType) {
@@ -51,7 +53,7 @@ public class DynamicFieldType extends RelDataTypeImpl {
   }
 
   public StructKind getStructKind() {
-    return delegate.getStructKind();
+    return StructKind.PEEK_FIELDS_DEFAULT;
   }
 
   public RelDataTypeField getField(String fieldName, boolean caseSensitive,
