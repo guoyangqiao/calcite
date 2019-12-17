@@ -46,7 +46,7 @@ class RelDataTypeHolder {
    * Get field if exists, otherwise inserts a new field. The new field by default will have "any"
    * type, except for the dynamic star field.
    *
-   * @param fieldName Request field name
+   * @param fieldName     Request field name
    * @param caseSensitive Case Sensitive
    * @return A pair of RelDataTypeField and Boolean. Boolean indicates whether a new field is added
    * to this holder.
@@ -70,7 +70,11 @@ class RelDataTypeHolder {
     RelDataTypeField newField = new RelDataTypeFieldImpl(
         fieldName,
         fields.size(),
-        typeFactory.createTypeWithNullability(typeFactory.createSqlType(typeName), true));
+        new DynamicFieldType(
+            new DynamicRecordTypeImpl(typeFactory),
+            typeFactory.createTypeWithNullability(typeFactory.createSqlType(typeName), true)
+        )
+    );
 
     // Add the name to our list of field names
     fields.add(newField);
