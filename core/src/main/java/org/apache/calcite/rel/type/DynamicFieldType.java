@@ -10,11 +10,10 @@ import java.util.List;
 
 public class DynamicFieldType extends RelDataTypeImpl {
 
-  private RelDataType delegate;
-
   private final DynamicRecordType relayType;
   private final RelDataType endPointType;
 
+  private RelDataType delegate;
 
   public void switchToRelay() {
     this.delegate = relayType;
