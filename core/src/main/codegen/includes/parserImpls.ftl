@@ -43,11 +43,9 @@ List<SqlNode> args;
 
 SqlCall MatchesAnyFunctionCall() :
 {
-List<SqlNode> args;
+    List<SqlNode> args;
     SqlNode e;
     final Span s;
-    TimeUnit interval;
-    SqlNode node;
 }
 {
     <MATCHES_ANY>
@@ -55,7 +53,10 @@ List<SqlNode> args;
         s = span();
     }
     <LPAREN>
-        e = Expression(ExprContext.ACCEPT_SUB_QUERY) { args.add(e); }
+        e = Expression(ExprContext.ACCEPT_SUB_QUERY)
+        {
+            args = startList(e);
+        }
     <COMMA>
         e = Expression(ExprContext.ACCEPT_SUB_QUERY) { args.add(e); }
     (
