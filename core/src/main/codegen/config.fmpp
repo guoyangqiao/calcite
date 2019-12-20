@@ -48,7 +48,6 @@ data: {
     # keyword add it to 'nonReservedKeywords' section.
     keywords: [
       "DATE_ADD"
-      "REGEXP"
     ]
 
     # List of keywords from "keywords" section that are not reserved.
