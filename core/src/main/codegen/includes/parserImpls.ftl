@@ -39,3 +39,31 @@ List<SqlNode> args;
                         s.end(this), args);
                         }
 }
+
+
+SqlCall MatchesAnyFunctionCall() :
+{
+List<SqlNode> args;
+    SqlNode e;
+    final Span s;
+    TimeUnit interval;
+    SqlNode node;
+}
+{
+    <MATCHES_ANY>
+    {
+        s = span();
+    }
+    <LPAREN>
+        e = Expression(ExprContext.ACCEPT_SUB_QUERY) { args.add(e); }
+    <COMMA>
+        e = Expression(ExprContext.ACCEPT_SUB_QUERY) { args.add(e); }
+    (
+    <COMMA>
+        e = Expression(ExprContext.ACCEPT_SUB_QUERY) { args.add(e); }
+    )*
+    <RPAREN>
+    {
+        return SqlStdOperatorTable.MATCHES_ANY.createCall(s.end(this), args);
+    }
+}

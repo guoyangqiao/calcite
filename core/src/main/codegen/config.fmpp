@@ -42,12 +42,14 @@ data: {
     # Example. "org.apache.calcite.sql.*", "java.util.List".
     imports: [
       "org.apache.calcite.sql.fun.SqlDateAddFunction"
+      "org.apache.calcite.sql.fun.SqlMatchesAnyFunction"
     ]
 
     # List of new keywords. Example: "DATABASES", "TABLES". If the keyword is not a reserved
     # keyword add it to 'nonReservedKeywords' section.
     keywords: [
       "DATE_ADD"
+      "MATCHES_ANY"
     ]
 
     # List of keywords from "keywords" section that are not reserved.
@@ -385,6 +387,7 @@ data: {
     # Example: DateFunctionCall().
     builtinFunctionCallMethods: [
       "DateAddFunctionCall()"
+      "MatchesAnyFunctionCall()"
     ]
 
     # List of methods for parsing extensions to "ALTER <scope>" calls.
