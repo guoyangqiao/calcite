@@ -135,6 +135,16 @@ class QueryBuilders {
   }
 
   /**
+   * A filter for a filed based on wildcard query
+   *
+   * @param name  field name
+   * @param value wildcard value
+   */
+  static WildcardQueryBuilder wildcardQuery(String name, String value) {
+    return new WildcardQueryBuilder(name, value);
+  }
+
+  /**
    * A Query that matches documents within an range of terms.
    *
    * @param name The field name
@@ -361,6 +371,31 @@ class QueryBuilders {
     void writeJson(final JsonGenerator generator) throws IOException {
       generator.writeStartObject();
       generator.writeFieldName("term");
+      generator.writeStartObject();
+      generator.writeFieldName(fieldName);
+      writeObject(generator, value);
+      generator.writeEndObject();
+      generator.writeEndObject();
+    }
+  }
+
+  /**
+   * A Query that matches documents using wildcard.
+   */
+  static class WildcardQueryBuilder extends QueryBuilder {
+    private final String fieldName;
+    private final Object value;
+
+    private WildcardQueryBuilder(final String fieldName, final Object value) {
+      this.fieldName = Objects.requireNonNull(fieldName, "fieldName");
+      Objects.requireNonNull(value, "value");
+      this.value = value;
+    }
+
+    @Override
+    void writeJson(final JsonGenerator generator) throws IOException {
+      generator.writeStartObject();
+      generator.writeFieldName("wildcard");
       generator.writeStartObject();
       generator.writeFieldName(fieldName);
       writeObject(generator, value);
