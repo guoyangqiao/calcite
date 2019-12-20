@@ -356,6 +356,7 @@ class ElasticsearchRules {
    * Implemented:
    * a field with LIKEs to single elasticsearch MATCH semantic
    */
+  @Deprecated//like convert to wildcard
   private static class ElasticsearchFilterLikeToMatchRule extends RelOptRule {
     private static final ElasticsearchFilterLikeToMatchRule INSTANCE = new ElasticsearchFilterLikeToMatchRule();
 
