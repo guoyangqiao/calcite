@@ -22,6 +22,6 @@ public class SqlMatchesAnyFunction extends SqlFunction {
         RETURN_TYPE_INFERENCE,
         null,//TODO
         null,//TODO
-        SqlFunctionCategory.USER_DEFINED_FUNCTION);
+        SqlFunctionCategory.USER_DEFINED_SPECIFIC_FUNCTION);
   }
 }
