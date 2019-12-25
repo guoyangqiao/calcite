@@ -21,7 +21,10 @@ import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.jdbc.CalcitePrepare;
 import org.apache.calcite.jdbc.CalciteSchema;
-import org.apache.calcite.rel.type.*;
+import org.apache.calcite.rel.type.DynamicRecordTypeImpl;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.rel.type.RelDataTypeImpl;
 import org.apache.calcite.schema.FunctionParameter;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.TableMacro;
@@ -135,13 +138,13 @@ public class ViewTableMacro implements TableMacro {
 
     @Override
     protected ViewTable viewTable(CalcitePrepare.AnalyzeViewResult parsed, String viewSql, List<String> schemaPath, List<String> viewPath) {
-      final RelRecordType rowType = (RelRecordType) parsed.rowType;
+      final RelDataType rowType = parsed.rowType;
       final JavaTypeFactory typeFactory = (JavaTypeFactory) parsed.typeFactory;
       final RelDataType dynamicRecordType = new DynamicRecordTypeImpl(typeFactory);
       //Fulfill origin row fields
       List<RelDataTypeField> fieldList = dynamicRecordType.getFieldList();
       fieldList.addAll(rowType.getFieldList());
-      return new ViewTable(typeFactory.getJavaClass(rowType), RelDataTypeImpl.proto(dynamicRecordType), viewSql, schemaPath, viewPath);
+      return new ViewTable(typeFactory.getJavaClass(dynamicRecordType), RelDataTypeImpl.proto(dynamicRecordType), viewSql, schemaPath, viewPath);
     }
   }
 
