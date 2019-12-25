@@ -330,7 +330,7 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   }
 
   // implement RelDataTypeFactory
-  public RelDataType createTypeWithNullabiwelity(
+  public RelDataType createTypeWithNullability(
       final RelDataType type,
       final boolean nullable) {
     Objects.requireNonNull(type);
