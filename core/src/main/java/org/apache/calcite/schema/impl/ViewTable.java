@@ -50,7 +50,7 @@ import java.util.Objects;
  */
 public class ViewTable
     extends AbstractQueryableTable
-    implements TranslatableTable {
+    implements TranslatableTable, AbstractCustomColumnResolvingTable {
   private final String viewSql;
   private final List<String> schemaPath;
   private final RelProtoDataType protoRowType;
