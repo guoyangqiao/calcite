@@ -52,7 +52,7 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   private final LoadingCache<Key, RelDataType> KEY2TYPE_CACHE =
       CacheBuilder.newBuilder()
           .softValues()
-          .build(CacheLoader.from(RelDataTypeFactoryImpl::keyToType));
+          .build(CacheLoader.from(this::keyToType));
 
   /**
    * Global cache for RelDataType.
@@ -62,15 +62,20 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   private final Interner<RelDataType> DATATYPE_CACHE =
       Interners.newWeakInterner();
 
-  private static RelDataType keyToType(@Nonnull Key key) {
-    final ImmutableList.Builder<RelDataTypeField> list =
-        ImmutableList.builder();
+  /**
+   * As our demand, always use {@link DynamicRecordType}
+   * @param key
+   * @return
+   */
+  private RelDataType keyToType(@Nonnull Key key) {
+    final ImmutableList.Builder<RelDataTypeField> fieldListBuilder = ImmutableList.builder();
     for (int i = 0; i < key.names.size(); i++) {
-      list.add(
-          new RelDataTypeFieldImpl(
-              key.names.get(i), i, key.types.get(i)));
+      fieldListBuilder.add(new RelDataTypeFieldImpl(key.names.get(i), i, key.types.get(i)));
     }
-    return new RelRecordType(key.kind, list.build(), key.nullable);
+    DynamicRecordTypeImpl dynamicRecordType = new DynamicRecordTypeImpl(this);
+    dynamicRecordType.getFieldList().addAll(fieldListBuilder.build());
+    dynamicRecordType.computeDigest();
+    return dynamicRecordType;
   }
 
   private static final Map<Class, RelDataTypeFamily> CLASS_FAMILIES =
@@ -100,7 +105,9 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
 
   //~ Constructors -----------------------------------------------------------
 
-  /** Creates a type factory. */
+  /**
+   * Creates a type factory.
+   */
   protected RelDataTypeFactoryImpl(RelDataTypeSystem typeSystem) {
     this.typeSystem = Objects.requireNonNull(typeSystem);
   }
@@ -116,7 +123,7 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
     final JavaType javaType =
         clazz == String.class
             ? new JavaType(clazz, true, getDefaultCharset(),
-                SqlCollation.IMPLICIT)
+            SqlCollation.IMPLICIT)
             : new JavaType(clazz);
     return canonize(javaType);
   }
@@ -139,16 +146,16 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   }
 
   public RelDataType createStructType(StructKind kind,
-      final List<RelDataType> typeList,
-      final List<String> fieldNameList) {
+                                      final List<RelDataType> typeList,
+                                      final List<String> fieldNameList) {
     return createStructType(kind, typeList,
         fieldNameList, false);
   }
 
   private RelDataType createStructType(StructKind kind,
-      final List<RelDataType> typeList,
-      final List<String> fieldNameList,
-      final boolean nullable) {
+                                       final List<RelDataType> typeList,
+                                       final List<String> fieldNameList,
+                                       final boolean nullable) {
     assert typeList.size() == fieldNameList.size();
     return canonize(kind, fieldNameList, typeList, nullable);
   }
@@ -158,20 +165,24 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
       final RelDataTypeFactory.FieldInfo fieldInfo) {
     return canonize(StructKind.FULLY_QUALIFIED,
         new AbstractList<String>() {
-          @Override public String get(int index) {
+          @Override
+          public String get(int index) {
             return fieldInfo.getFieldName(index);
           }
 
-          @Override public int size() {
+          @Override
+          public int size() {
             return fieldInfo.getFieldCount();
           }
         },
         new AbstractList<RelDataType>() {
-          @Override public RelDataType get(int index) {
+          @Override
+          public RelDataType get(int index) {
             return fieldInfo.getFieldType(index);
           }
 
-          @Override public int size() {
+          @Override
+          public int size() {
             return fieldInfo.getFieldCount();
           }
         });
@@ -186,20 +197,24 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
       final List<? extends Map.Entry<String, RelDataType>> fieldList, boolean nullable) {
     return canonize(StructKind.FULLY_QUALIFIED,
         new AbstractList<String>() {
-          @Override public String get(int index) {
+          @Override
+          public String get(int index) {
             return fieldList.get(index).getKey();
           }
 
-          @Override public int size() {
+          @Override
+          public int size() {
             return fieldList.size();
           }
         },
         new AbstractList<RelDataType>() {
-          @Override public RelDataType get(int index) {
+          @Override
+          public RelDataType get(int index) {
             return fieldList.get(index).getValue();
           }
 
-          @Override public int size() {
+          @Override
+          public int size() {
             return fieldList.size();
           }
         }, nullable);
@@ -290,7 +305,8 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
     // the nullability of the individual fields.
     return createStructType(type.getStructKind(),
         new AbstractList<RelDataType>() {
-          @Override public RelDataType get(int index) {
+          @Override
+          public RelDataType get(int index) {
             RelDataType fieldType =
                 type.getFieldList().get(index).getType();
             if (ignoreNullable) {
@@ -300,7 +316,8 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
             }
           }
 
-          @Override public int size() {
+          @Override
+          public int size() {
             return type.getFieldCount();
           }
         },
@@ -313,7 +330,7 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   }
 
   // implement RelDataTypeFactory
-  public RelDataType createTypeWithNullability(
+  public RelDataType createTypeWithNullabiwelity(
       final RelDataType type,
       final boolean nullable) {
     Objects.requireNonNull(type);
@@ -333,7 +350,7 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
       // nullable, so in principle we could always set the nested attributes to be nullable.
       // However, this might create regressions so we will not do it and we will keep previous
       // behavior.
-      newType = copyRecordType((RelRecordType) type, !nullable,  nullable);
+      newType = copyRecordType((RelRecordType) type, !nullable, nullable);
     } else {
       newType = copySimpleType(type, nullable);
     }
@@ -359,9 +376,9 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
    * references into other data structures.</p>
    */
   protected RelDataType canonize(final StructKind kind,
-      final List<String> names,
-      final List<RelDataType> types,
-      final boolean nullable) {
+                                 final List<String> names,
+                                 final List<RelDataType> types,
+                                 final boolean nullable) {
     final RelDataType type = KEY2TYPE_CACHE.getIfPresent(
         new Key(kind, names, types, nullable));
     if (type != null) {
@@ -373,8 +390,8 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   }
 
   protected RelDataType canonize(final StructKind kind,
-      final List<String> names,
-      final List<RelDataType> types) {
+                                 final List<String> names,
+                                 final List<RelDataType> types) {
     return canonize(kind, names, types, false);
   }
 
@@ -544,7 +561,8 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
       return nullable;
     }
 
-    @Override public RelDataTypeFamily getFamily() {
+    @Override
+    public RelDataTypeFamily getFamily() {
       RelDataTypeFamily family = CLASS_FAMILIES.get(clazz);
       return family != null ? family : this;
     }
@@ -582,7 +600,9 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
     }
   }
 
-  /** Key to the data type cache. */
+  /**
+   * Key to the data type cache.
+   */
   private static class Key {
     private final StructKind kind;
     private final List<String> names;
@@ -596,11 +616,13 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
       this.nullable = nullable;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return Objects.hash(kind, names, types, nullable);
     }
 
-    @Override public boolean equals(Object obj) {
+    @Override
+    public boolean equals(Object obj) {
       return obj == this
           || obj instanceof Key
           && kind == ((Key) obj).kind
