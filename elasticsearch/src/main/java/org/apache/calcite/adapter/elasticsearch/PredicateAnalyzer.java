@@ -918,7 +918,7 @@ class PredicateAnalyzer {
 
     private static <R, T> List<T> oneToEndIteration(List<R> iterable, Function<R, T> map) {
       List<T> result = new ArrayList<>();
-      for (int i = 0; i < iterable.size(); i++) {
+      for (int i = 1; i < iterable.size(); i++) {
         T appRes = map.apply(iterable.get(i));
         result.add(appRes);
       }
