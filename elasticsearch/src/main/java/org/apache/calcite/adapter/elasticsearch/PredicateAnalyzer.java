@@ -54,6 +54,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -564,12 +565,8 @@ class PredicateAnalyzer {
             case GREATER_THAN_OR_EQUAL:
             case LESS_THAN:
             case LESS_THAN_OR_EQUAL:
+            case IN:
               return true;
-            case OTHER_FUNCTION:
-              final String operator = call.getOperator().getName();
-              if (ElasticsearchConstants.ES_MATCH_AND.equalsIgnoreCase(operator) || ElasticsearchConstants.ES_MATCH_OR.equalsIgnoreCase(operator)) {
-                return true;
-              }
             default:
               return false;
           }
@@ -810,9 +807,10 @@ class PredicateAnalyzer {
 
       checkForIncompatibleDateTimeOperands(call);
 
-      Preconditions.checkState(call.getOperands().size() == 2);
-      final Expression a = call.getOperands().get(0).accept(this);
-      final Expression b = call.getOperands().get(1).accept(this);
+      List<RexNode> operands = call.getOperands();
+      Preconditions.checkState(operands.size() == 2);
+      final Expression a = operands.get(0).accept(this);
+      final Expression b = operands.get(1).accept(this);
 
       final SwapResult pair = swap(a, b);
       final boolean swapped = pair.isSwapped();
@@ -868,6 +866,8 @@ class PredicateAnalyzer {
             return QueryExpression.create(pair.getKey()).gte(pair.getValue());
           }
           return QueryExpression.create(pair.getKey()).lte(pair.getValue());
+        case IN:
+          QueryExpression.create((TerminalExpression) operands.get(0).accept(this)).in(oneToEndIteration(operands, c -> new LiteralExpression((RexLiteral) c)));
         default:
           break;
       }
@@ -913,6 +913,15 @@ class PredicateAnalyzer {
           String message = String.format(Locale.ROOT, "Unable to handle call: [%s]", call);
           throw new PredicateAnalyzerException(message);
       }
+    }
+
+    private static <R, T> List<T> oneToEndIteration(List<R> iterable, Function<R, T> map) {
+      List<T> result = new ArrayList<>();
+      for (int i = 0; i < iterable.size(); i++) {
+        T appRes = map.apply(iterable.get(i));
+        result.add(appRes);
+      }
+      return result;
     }
 
     /**
@@ -1155,7 +1164,7 @@ class PredicateAnalyzer {
 
     public abstract QueryExpression match(LiteralExpression literal, String operator, int minimum);
 
-    public abstract QueryExpression in(String field, Collection<LiteralExpression> literal);
+    public abstract QueryExpression in(Collection<LiteralExpression> literal);
 
     public abstract QueryExpression queryString(String query);
 
@@ -1354,7 +1363,7 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression in(String field, Collection<LiteralExpression> literal) {
+    public QueryExpression in(Collection<LiteralExpression> literal) {
       throw new PredicateAnalyzerException("SqlOperatorImpl ['in'] "
           + "cannot be applied to a compound expression");
     }
@@ -1513,8 +1522,8 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression in(String field, Collection<LiteralExpression> literal) {
-      builder = QueryBuilders.termsQuery(field, literal.stream().map(x -> x.literal.getValue()).collect(Collectors.toList()));
+    public QueryExpression in(Collection<LiteralExpression> literal) {
+      builder = QueryBuilders.termsQuery(rel.getRootName(), literal.stream().map(x -> x.literal.getValue()).collect(Collectors.toList()));
       return this;
     }
 
