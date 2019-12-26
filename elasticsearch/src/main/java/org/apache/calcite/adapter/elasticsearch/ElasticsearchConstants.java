@@ -17,10 +17,6 @@
 package org.apache.calcite.adapter.elasticsearch;
 
 import com.google.common.collect.ImmutableSet;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlOperator;
-import org.apache.calcite.sql.SqlSyntax;
-import org.apache.calcite.sql.fun.SqlInOperator;
 
 import java.util.Set;
 
@@ -58,29 +54,6 @@ interface ElasticsearchConstants {
   static boolean isSelectAll(String name) {
     return "_MAP".equals(name);
   }
-
-  class ElasticsearchMatchOperator extends SqlInOperator {
-
-    private final String operator;
-
-    ElasticsearchMatchOperator(String name, String operator) {
-      super(name, SqlKind.OTHER_FUNCTION);
-      this.operator = operator;
-    }
-
-    String getOperator() {
-      return operator;
-    }
-
-    @Override
-    public SqlSyntax getSyntax() {
-      return SqlSyntax.BINARY;
-    }
-  }
-
-  SqlOperator MATCH_AND_SQL_OPERATOR = new ElasticsearchMatchOperator(ES_MATCH_AND, AND);
-
-  SqlOperator MATCH_OR_SQL_OPERATOR = new ElasticsearchMatchOperator(ES_MATCH_OR, OR);
 
   /**
    * Trim SQL like percent sign around

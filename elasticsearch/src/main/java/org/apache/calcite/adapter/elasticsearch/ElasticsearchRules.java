@@ -21,12 +21,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.calcite.adapter.enumerable.RexImpTable;
 import org.apache.calcite.adapter.enumerable.RexToLixTranslator;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
-import org.apache.calcite.plan.*;
+import org.apache.calcite.plan.Convention;
+import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.RelTrait;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
-import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
@@ -34,7 +36,6 @@ import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.*;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
@@ -43,7 +44,6 @@ import java.io.StringWriter;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Rules and relational operators for
@@ -56,7 +56,6 @@ class ElasticsearchRules {
       ElasticsearchFilterRule.INSTANCE,
       ElasticsearchProjectRule.INSTANCE,
       ElasticsearchAggregateRule.INSTANCE,
-      ElasticsearchFilterLikeToMatchRule.INSTANCE
   };
 
   private ElasticsearchRules() {
@@ -348,79 +347,6 @@ class ElasticsearchRules {
       final RelTraitSet traitSet = project.getTraitSet().replace(out);
       return new ElasticsearchProject(project.getCluster(), traitSet,
           convert(project.getInput(), out), project.getProjects(), project.getRowType());
-    }
-  }
-
-  /**
-   * Rule to modify {@link ElasticsearchFilter} condition.
-   * Implemented:
-   * a field with LIKEs to single elasticsearch MATCH semantic
-   */
-  @Deprecated//like convert to wildcard
-  private static class ElasticsearchFilterLikeToMatchRule extends RelOptRule {
-    private static final ElasticsearchFilterLikeToMatchRule INSTANCE = new ElasticsearchFilterLikeToMatchRule();
-
-    ElasticsearchFilterLikeToMatchRule() {
-      super(operand(Filter.class, any()), "ElasticsearchFilterLikeToMatchRule");
-    }
-
-    @Override
-    public void onMatch(RelOptRuleCall call) {
-      final Filter rel = call.rel(0);
-      final RexBuilder rexBuilder = call.builder().getRexBuilder();
-      final RexShuttle shuttle = new RexShuttle() {
-        @Override
-        public RexNode visitCall(RexCall rexCall) {
-          final SqlOperator operator = rexCall.getOperator();
-          if (SqlStdOperatorTable.AND.equals(operator) || SqlStdOperatorTable.OR.equals(operator)) {
-            final List<RexNode> conditionGroup = rexCall.getOperands();
-            if (allLike(conditionGroup) && equivalentInput(conditionGroup)) {
-              try {
-                final String matchStr = conditionGroup.stream().map(x -> {
-                  final RexNode rexNode = ((RexCall) x).getOperands().get(1);
-                  if (rexNode instanceof RexLiteral) {
-                    return ElasticsearchConstants.trimPercentSign(((RexLiteral) rexNode).getValueAs(String.class));
-                  }
-                  throw new IllegalArgumentException("Not compatible with non literal");
-                }).collect(Collectors.joining(ElasticsearchConstants.WHITE_SPACE));
-                return call.builder().
-                    getRexBuilder().
-                    makeCall(
-                        SqlStdOperatorTable.AND.equals(operator) ? ElasticsearchConstants.MATCH_AND_SQL_OPERATOR : ElasticsearchConstants.MATCH_OR_SQL_OPERATOR,
-                        ((RexCall) conditionGroup.get(0)).getOperands().get(0),
-                        rexBuilder.makeLiteral(matchStr)
-                    );
-              } catch (IllegalArgumentException t) {
-                //ok, not like contains some unusual value, return to normal case
-              }
-            }
-          }
-          return super.visitCall(rexCall);
-        }
-      };
-      final RelNode accept = rel.accept(shuttle);
-      call.transformTo(accept);
-    }
-
-    private boolean equivalentInput(List<RexNode> conditionGroup) {
-      return conditionGroup.stream().map(x -> {
-        if (x instanceof RexCall) {
-//          CAST(ITEM($0, 'all_uni_shop_id')):VARCHAR(65535)
-          try {
-            final RexNode rexNode = (RexNode) ((List) ((RexCall) ((List) ((RexCall) ((List) ((RexCall) x).operands).get(0)).operands).get(0)).operands).get(0);
-            if (rexNode instanceof RexInputRef) {
-              return ((RexInputRef) rexNode).getIndex();
-            }
-          } catch (Throwable t) {
-            //desire failed
-          }
-        }
-        return -1;
-      }).collect(Collectors.toSet()).size() == 1;
-    }
-
-    private boolean allLike(List<RexNode> conditionGroup) {
-      return conditionGroup.stream().allMatch(x -> (x instanceof RexCall && ((RexCall) x).getOperator().equals(SqlStdOperatorTable.LIKE)));
     }
   }
 

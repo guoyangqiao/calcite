@@ -602,19 +602,17 @@ class PredicateAnalyzer {
     public Expression visitFieldAccess(RexFieldAccess fieldAccess) {
       Expression inputExpression = fieldAccess.getReferenceExpr().accept(this);
       if (inputExpression instanceof TerminalExpression) {
-        if (CastExpression.isCastExpression(inputExpression)) {
-          TerminalExpression inputTerminal = CastExpression.unpack((TerminalExpression) inputExpression);
-          if (inputTerminal instanceof NamedFieldExpression) {
-            String rootName = ((NamedFieldExpression) inputTerminal).getRootName();
-            Map<String, ElasticsearchMapping.Datatype> mapping = relOptTable.unwrap(ElasticsearchTable.class).transport.mapping.mapping();
-            ElasticsearchMapping.Datatype datatype = mapping.get(rootName);
-            if (datatype != null && JOIN_TYPE.equalsIgnoreCase(datatype.name())) {
-              //If it is a join type field, return parent expression
-              return inputTerminal;
-            }
-            RexBuilder rexBuilder = topNode.getCluster().getRexBuilder();
-            return new NamedFieldExpression(rexBuilder.makeLiteral(rootName + "." + fieldAccess.getField().getName()));
+        TerminalExpression inputTerminal = CastExpression.unpack((TerminalExpression) inputExpression);
+        if (inputTerminal instanceof NamedFieldExpression) {
+          String rootName = ((NamedFieldExpression) inputTerminal).getRootName();
+          Map<String, ElasticsearchMapping.Datatype> mapping = relOptTable.unwrap(ElasticsearchTable.class).transport.mapping.mapping();
+          ElasticsearchMapping.Datatype datatype = mapping.get(rootName);
+          if (datatype != null && JOIN_TYPE.equalsIgnoreCase(datatype.name())) {
+            //If it is a join type field, return parent expression
+            return inputTerminal;
           }
+          RexBuilder rexBuilder = topNode.getCluster().getRexBuilder();
+          return new NamedFieldExpression(rexBuilder.makeLiteral(rootName + "." + fieldAccess.getField().getName()));
         }
       }
       //Fall back
@@ -654,6 +652,27 @@ class PredicateAnalyzer {
               throw new PredicateAnalyzerException(message);
           }
         case FUNCTION:
+          if (call.getOperator().getName().equalsIgnoreCase("MATCHES_ANY")) {
+            List<RexNode> operands = call.getOperands();
+            RexNode node = operands.get(0);
+            Expression accept = node.accept(this);
+            List<String> matches = new ArrayList<>();
+            RexShuttle literalVisitor = new RexShuttle() {
+              @Override
+              public RexNode visitLiteral(RexLiteral literal) {
+                matches.add(literal.getValueAs(String.class));
+                return super.visitLiteral(literal);
+              }
+            };
+            for (int i = 1; i < operands.size(); i++) {
+              RexNode node1 = operands.get(i);
+              node1.accept(literalVisitor);
+            }
+            RexBuilder rexBuilder = topNode.getCluster().getRexBuilder();
+            return QueryExpression
+                .create(CastExpression.unpack((TerminalExpression) accept))
+                .match(new LiteralExpression(rexBuilder.makeLiteral(String.join(ElasticsearchConstants.WHITE_SPACE, matches))), ElasticsearchConstants.OR, 1);
+          }
           if (call.getOperator().getName().equalsIgnoreCase("CONTAINS")) {
             List<Expression> operands = new ArrayList<>();
             for (RexNode node : call.getOperands()) {
@@ -873,11 +892,6 @@ class PredicateAnalyzer {
             return QueryExpression.create(pair.getKey()).gte(pair.getValue());
           }
           return QueryExpression.create(pair.getKey()).lte(pair.getValue());
-        case OTHER_FUNCTION:
-          final SqlOperator operator = call.getOperator();
-          if (operator instanceof ElasticsearchConstants.ElasticsearchMatchOperator) {
-            return QueryExpression.create(pair.getKey()).match(pair.getValue(), ((ElasticsearchConstants.ElasticsearchMatchOperator) operator).getOperator());
-          }
         default:
           break;
       }
@@ -1085,7 +1099,7 @@ class PredicateAnalyzer {
 
     public abstract QueryExpression lte(LiteralExpression literal);
 
-    public abstract QueryExpression match(LiteralExpression literal, String operator);
+    public abstract QueryExpression match(LiteralExpression literal, String operator, int minimum);
 
     public abstract QueryExpression queryString(String query);
 
@@ -1278,7 +1292,7 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression match(LiteralExpression literal, String operator) {
+    public QueryExpression match(LiteralExpression literal, String operator, int minimum) {
       throw new PredicateAnalyzerException("SqlOperatorImpl ['match'] "
           + "cannot be applied to a compound expression");
     }
@@ -1431,8 +1445,8 @@ class PredicateAnalyzer {
     }
 
     @Override
-    public QueryExpression match(LiteralExpression literal, String operator) {
-      builder = QueryBuilders.matchQuery(getFieldReference(), literal.stringValue(), operator);
+    public QueryExpression match(LiteralExpression literal, String operator, int minimum) {
+      builder = QueryBuilders.matchQuery(getFieldReference(), literal.stringValue(), operator, minimum);
       return this;
     }
 

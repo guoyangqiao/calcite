@@ -18,7 +18,6 @@ package org.apache.calcite.adapter.elasticsearch;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.junit.Test;
 
 import java.io.IOException;
@@ -194,9 +193,9 @@ public class QueryBuildersTest {
   @Test
   public void match() throws IOException {
     assertEquals("{\"match\":{\"foo\":{\"query\":\"bar quex\",\"operator\":\"and\",\"minimum_should_match\":1}}}",
-        toJson(QueryBuilders.matchQuery("foo", "bar quex", ElasticsearchConstants.AND)));
+        toJson(QueryBuilders.matchQuery("foo", "bar quex", ElasticsearchConstants.AND, 1)));
     assertEquals("{\"match\":{\"foo\":{\"query\":\"bar quex\",\"operator\":\"or\",\"minimum_should_match\":1}}}",
-        toJson(QueryBuilders.matchQuery("foo", "bar quex", ElasticsearchConstants.OR)));
+        toJson(QueryBuilders.matchQuery("foo", "bar quex", ElasticsearchConstants.OR, 1)));
   }
 
   @Test
