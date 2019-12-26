@@ -808,7 +808,8 @@ class PredicateAnalyzer {
       checkForIncompatibleDateTimeOperands(call);
 
       List<RexNode> operands = call.getOperands();
-      Preconditions.checkState(operands.size() == 2);
+      //Modified by GYQ, since IN implemented, size may exceeds 2
+//      Preconditions.checkState(operands.size() == 2);
       final Expression a = operands.get(0).accept(this);
       final Expression b = operands.get(1).accept(this);
 
