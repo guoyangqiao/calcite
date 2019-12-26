@@ -52,7 +52,7 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   private final LoadingCache<Key, RelDataType> KEY2TYPE_CACHE =
       CacheBuilder.newBuilder()
           .softValues()
-          .build(CacheLoader.from(this::keyToType));
+          .build(CacheLoader.from(RelDataTypeFactoryImpl::keyToType));
 
   /**
    * Global cache for RelDataType.
@@ -62,20 +62,15 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   private final Interner<RelDataType> DATATYPE_CACHE =
       Interners.newWeakInterner();
 
-  /**
-   * As our demand, always use {@link DynamicRecordType}
-   * @param key
-   * @return
-   */
-  private RelDataType keyToType(@Nonnull Key key) {
-    final ImmutableList.Builder<RelDataTypeField> fieldListBuilder = ImmutableList.builder();
+  private static RelDataType keyToType(@Nonnull Key key) {
+    final ImmutableList.Builder<RelDataTypeField> list =
+        ImmutableList.builder();
     for (int i = 0; i < key.names.size(); i++) {
-      fieldListBuilder.add(new RelDataTypeFieldImpl(key.names.get(i), i, key.types.get(i)));
+      list.add(
+          new RelDataTypeFieldImpl(
+              key.names.get(i), i, key.types.get(i)));
     }
-    DynamicRecordTypeImpl dynamicRecordType = new DynamicRecordTypeImpl(this);
-    dynamicRecordType.getFieldList().addAll(fieldListBuilder.build());
-    dynamicRecordType.computeDigest();
-    return dynamicRecordType;
+    return new RelRecordType(key.kind, list.build(), key.nullable);
   }
 
   private static final Map<Class, RelDataTypeFamily> CLASS_FAMILIES =
@@ -105,9 +100,7 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
 
   //~ Constructors -----------------------------------------------------------
 
-  /**
-   * Creates a type factory.
-   */
+  /** Creates a type factory. */
   protected RelDataTypeFactoryImpl(RelDataTypeSystem typeSystem) {
     this.typeSystem = Objects.requireNonNull(typeSystem);
   }
@@ -600,9 +593,7 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
     }
   }
 
-  /**
-   * Key to the data type cache.
-   */
+  /** Key to the data type cache. */
   private static class Key {
     private final StructKind kind;
     private final List<String> names;
