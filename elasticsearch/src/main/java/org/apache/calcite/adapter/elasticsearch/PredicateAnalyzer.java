@@ -110,7 +110,7 @@ class PredicateAnalyzer {
 
     try {
       // visits expression tree
-      QueryExpression e = (QueryExpression) expression.accept(new Visitor(RelOptUtil.findAllTables(topNode), elasticsearchRelContext.analyzePredicationMap));
+      QueryExpression e = (QueryExpression) expression.accept(new Visitor(topNode, elasticsearchRelContext.analyzePredicationMap));
 
       if (e != null && e.isPartial()) {
         throw new UnsupportedOperationException("Can't handle partial QueryExpression: " + e);
@@ -160,12 +160,16 @@ class PredicateAnalyzer {
     static final String ID = "ID";
     static final String TYPE_KEY = "type";
     static final String RELATIONS_KEY = "relations";
-    private final ImmutableList<RelOptTable> relOptTables;
+    private final RelNode topNode;
+    private final RelOptTable relOptTable;
     private final EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> predicationConditionMap;
 
-    private Visitor(List<RelOptTable> relOptTables, EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> analyzePredicationMap) {
+    private Visitor(RelNode relNode, EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> analyzePredicationMap) {
       super(true);
-      this.relOptTables = ImmutableList.copyOf(relOptTables);
+      List<RelOptTable> tables = RelOptUtil.findAllTables(relNode);
+      assert tables.size() == 1;
+      this.topNode = relNode;
+      this.relOptTable = tables.get(0);
       this.predicationConditionMap = analyzePredicationMap;
     }
 
@@ -201,35 +205,33 @@ class PredicateAnalyzer {
                 final List<RexNode> operands = ((RexCall) castOp1).getOperands();
                 final RexLiteral literalRef = (RexLiteral) operands.get(1);
                 final String fieldName = literalRef.getValueAs(String.class);
-                if (relOptTables.size() == 1) {
-                  final ElasticsearchMapping mapping = getElasticTable().transport.mapping;
-                  final Map<String, ElasticsearchMapping.Datatype> fieldMapping = mapping.mapping();
-                  final ElasticsearchMapping.Datatype datatype = fieldMapping.get(fieldName);
-                  if (datatype != null) {
-                    final JsonNode properties = datatype.properties();
-                    if (isJoinType(properties)) {
-                      final RelNode subQueryNode = RelCopyShuttle.copyOf(subQuery.rel);
-                      if (subQueryNode.getRowType().getFieldList().size() == 1) {
-                        final Project probeProject = firstClassInstance(Project.class, subQueryNode);
-                        if (probeProject != null) {
-                          final List<RelDataTypeField> fieldList = probeProject.getRowType().getFieldList();
-                          if (fieldList.size() == 1) {
-                            final RelDataTypeField project = fieldList.get(0);
-                            final String name = project.getName();
-                            if (ID.equalsIgnoreCase(name)) {
-                              QueryBuilder queryBuilder;
-                              final Filter filter = firstClassInstance(Filter.class, subQueryNode);
-                              if (filter != null) {
-                                RelNode bestExp = implElasticsearchRel(filter);
-                                ElasticsearchRel.Implementor implementor = implementRel((ElasticsearchRel) bestExp);
-                                List<Object> queryBuilders = implementor.list.stream().filter(x -> x instanceof QueryBuilder).collect(Collectors.toList());
-                                assert queryBuilders.size() == 1;
-                                queryBuilder = (QueryBuilder) queryBuilders.get(0);
-                              } else {
-                                queryBuilder = QueryBuilders.matchAll();
-                              }
-                              return new PromisedQueryExpression(predicationConditionMap).promised(ConditionalReduction.CHILDREN_AGGREGATION, ConditionalReduction.ConditionKey.ROOT_ID_SELECTION, null, queryBuilder).orElse(null);
+                final ElasticsearchMapping mapping = getElasticTable().transport.mapping;
+                final Map<String, ElasticsearchMapping.Datatype> fieldMapping = mapping.mapping();
+                final ElasticsearchMapping.Datatype datatype = fieldMapping.get(fieldName);
+                if (datatype != null) {
+                  final JsonNode properties = datatype.properties();
+                  if (isJoinType(properties)) {
+                    final RelNode subQueryNode = RelCopyShuttle.copyOf(subQuery.rel);
+                    if (subQueryNode.getRowType().getFieldList().size() == 1) {
+                      final Project probeProject = firstClassInstance(Project.class, subQueryNode);
+                      if (probeProject != null) {
+                        final List<RelDataTypeField> fieldList = probeProject.getRowType().getFieldList();
+                        if (fieldList.size() == 1) {
+                          final RelDataTypeField project = fieldList.get(0);
+                          final String name = project.getName();
+                          if (ID.equalsIgnoreCase(name)) {
+                            QueryBuilder queryBuilder;
+                            final Filter filter = firstClassInstance(Filter.class, subQueryNode);
+                            if (filter != null) {
+                              RelNode bestExp = implElasticsearchRel(filter);
+                              ElasticsearchRel.Implementor implementor = implementRel((ElasticsearchRel) bestExp);
+                              List<Object> queryBuilders = implementor.list.stream().filter(x -> x instanceof QueryBuilder).collect(Collectors.toList());
+                              assert queryBuilders.size() == 1;
+                              queryBuilder = (QueryBuilder) queryBuilders.get(0);
+                            } else {
+                              queryBuilder = QueryBuilders.matchAll();
                             }
+                            return new PromisedQueryExpression(predicationConditionMap).promised(ConditionalReduction.CHILDREN_AGGREGATION, ConditionalReduction.ConditionKey.ROOT_ID_SELECTION, null, queryBuilder).orElse(null);
                           }
                         }
                       }
@@ -255,8 +257,7 @@ class PredicateAnalyzer {
     }
 
     private ElasticsearchTable getElasticTable() {
-      assert relOptTables.size() == 1;
-      return relOptTables.get(0).unwrap(ElasticsearchTable.class);
+      return relOptTable.unwrap(ElasticsearchTable.class);
     }
 
     /**
@@ -292,30 +293,28 @@ class PredicateAnalyzer {
             final RexLiteral literalRef = (RexLiteral) operands.get(1);
             if (inputRef.getIndex() == 0 || ID.equalsIgnoreCase(literalRef.getValueAs(String.class))) {
               //start matching the subquery
-              if (relOptTables.size() == 1) {
-                final ElasticsearchTable elasticsearchTable = getElasticTable();
-                if (elasticsearchTable != null) {
-                  final RelNode query = RelCopyShuttle.copyOf(subQuery.rel);
-                  if (query.getRowType().getFieldList().size() == 1) {
-                    RelNode probeProject;
-                    for (probeProject = query; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
-                      //ignore
-                    }
-                    if (probeProject instanceof Project) {
-                      testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
-                      if (projectionTest.get()) {
-                        final RexLiteral literal = testHasChildFilter(filterTest, query, elasticsearchTable.transport.mapping);
-                        if (filterTest.get()) {
-                          final RelNode imp = implElasticsearchRel(query);
-                          Filter filter = firstClassInstance(Filter.class, imp);
-                          if (filter != null) {
-                            ElasticsearchRel.Implementor implementor = implementRel((ElasticsearchRel) imp);
-                            QueryBuilder subQueryBuilder = implementor.firstQuery();
-                            if (subQueryBuilder != null) {
-                              return new PromisedQueryExpression(predicationConditionMap).orElse(new SimpleQueryExpression(null).hasChild((LiteralExpression) literal.accept(this), subQueryBuilder).builder());
-                            } else {
-                              throw new IllegalArgumentException("Unexpected subquery implementation");
-                            }
+              final ElasticsearchTable elasticsearchTable = getElasticTable();
+              if (elasticsearchTable != null) {
+                final RelNode query = RelCopyShuttle.copyOf(subQuery.rel);
+                if (query.getRowType().getFieldList().size() == 1) {
+                  RelNode probeProject;
+                  for (probeProject = query; probeProject.getInputs().size() != 0 && !(probeProject instanceof Project); probeProject = probeProject.getInput(0)) {
+                    //ignore
+                  }
+                  if (probeProject instanceof Project) {
+                    testProjection(projectionTest, elasticsearchTable.transport.mapping, probeProject);
+                    if (projectionTest.get()) {
+                      final RexLiteral literal = testHasChildFilter(filterTest, query, elasticsearchTable.transport.mapping);
+                      if (filterTest.get()) {
+                        final RelNode imp = implElasticsearchRel(query);
+                        Filter filter = firstClassInstance(Filter.class, imp);
+                        if (filter != null) {
+                          ElasticsearchRel.Implementor implementor = implementRel((ElasticsearchRel) imp);
+                          QueryBuilder subQueryBuilder = implementor.firstQuery();
+                          if (subQueryBuilder != null) {
+                            return new PromisedQueryExpression(predicationConditionMap).orElse(new SimpleQueryExpression(null).hasChild((LiteralExpression) literal.accept(this), subQueryBuilder).builder());
+                          } else {
+                            throw new IllegalArgumentException("Unexpected subquery implementation");
                           }
                         }
                       }
@@ -597,6 +596,17 @@ class PredicateAnalyzer {
         default:
           return false;
       }
+    }
+
+    @Override
+    public Expression visitFieldAccess(RexFieldAccess fieldAccess) {
+      RexNode referenceExpr = fieldAccess.getReferenceExpr();
+      Expression accept = referenceExpr.accept(this);
+      assert accept instanceof TerminalExpression;
+      RelDataTypeField field = fieldAccess.getField();
+      RexBuilder rexBuilder = topNode.getCluster().getRexBuilder();
+      NamedFieldExpression namedFieldExpression = new NamedFieldExpression(rexBuilder.makeLiteral("" + "." + field.getName()));
+      throw new RuntimeException("TODO");
     }
 
     @Override
