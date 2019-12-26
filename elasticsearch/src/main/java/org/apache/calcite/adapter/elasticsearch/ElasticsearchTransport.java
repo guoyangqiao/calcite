@@ -211,7 +211,7 @@ final class ElasticsearchTransport {
         httpParams.forEach(builder::addParameter);
         post = new HttpPost(builder.build());
         final String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(query);
-        LOGGER.info("Elasticsearch Query: {}", json);
+        LOGGER.info("Elasticsearch Query:\n{}", json);
         post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
       } catch (URISyntaxException e) {
         throw new RuntimeException(e);
