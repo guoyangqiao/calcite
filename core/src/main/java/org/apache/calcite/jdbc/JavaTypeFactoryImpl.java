@@ -71,7 +71,8 @@ public class JavaTypeFactoryImpl
     return canonize(new JavaRecordType(list, type));
   }
 
-  /** Returns the type of a field.
+  /**
+   * Returns the type of a field.
    *
    * <p>Takes into account {@link org.apache.calcite.adapter.java.Array}
    * annotations if present.
@@ -215,14 +216,16 @@ public class JavaTypeFactoryImpl
       case MULTISET:
         return List.class;
     }
-    return null;
+    return Object.class;
   }
 
   public RelDataType toSql(RelDataType type) {
     return toSql(this, type);
   }
 
-  /** Converts a type in Java format to a SQL-oriented type. */
+  /**
+   * Converts a type in Java format to a SQL-oriented type.
+   */
   public static RelDataType toSql(final RelDataTypeFactory typeFactory,
                                   RelDataType type) {
     if (type instanceof RelRecordType) {
@@ -287,8 +290,10 @@ public class JavaTypeFactoryImpl
     }
   }
 
-  /** Creates a synthetic Java class whose fields have the same names and
-   * relational types. */
+  /**
+   * Creates a synthetic Java class whose fields have the same names and
+   * relational types.
+   */
   private Type createSyntheticType(RelDataType type) {
     final String name =
         "Record" + type.getFieldCount() + "_" + syntheticTypes.size();
@@ -308,7 +313,9 @@ public class JavaTypeFactoryImpl
     return register(syntheticType);
   }
 
-  /** Synthetic record type. */
+  /**
+   * Synthetic record type.
+   */
   public static class SyntheticRecordType implements Types.RecordType {
     final List<Types.RecordField> fields = new ArrayList<>();
     final RelDataType relType;
@@ -335,7 +342,9 @@ public class JavaTypeFactoryImpl
     }
   }
 
-  /** Implementation of a field. */
+  /**
+   * Implementation of a field.
+   */
   private static class RecordFieldImpl implements Types.RecordField {
     private final SyntheticRecordType syntheticType;
     private final String name;

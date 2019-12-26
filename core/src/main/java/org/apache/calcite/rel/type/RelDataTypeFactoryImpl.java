@@ -52,7 +52,7 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   private final LoadingCache<Key, RelDataType> KEY2TYPE_CACHE =
       CacheBuilder.newBuilder()
           .softValues()
-          .build(CacheLoader.from(RelDataTypeFactoryImpl::keyToType));
+          .build(CacheLoader.from(this::keyToType));
 
   /**
    * Global cache for RelDataType.
@@ -62,15 +62,21 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
   private final Interner<RelDataType> DATATYPE_CACHE =
       Interners.newWeakInterner();
 
-  private static RelDataType keyToType(@Nonnull Key key) {
-    final ImmutableList.Builder<RelDataTypeField> list =
-        ImmutableList.builder();
+  /**
+   * As our demand, always use {@link DynamicRecordType}
+   *
+   * @param key
+   * @return
+   */
+  private RelDataType keyToType(@Nonnull Key key) {
+    final ImmutableList.Builder<RelDataTypeField> fieldListBuilder = ImmutableList.builder();
     for (int i = 0; i < key.names.size(); i++) {
-      list.add(
-          new RelDataTypeFieldImpl(
-              key.names.get(i), i, key.types.get(i)));
+      fieldListBuilder.add(new RelDataTypeFieldImpl(key.names.get(i), i, key.types.get(i)));
     }
-    return new RelRecordType(key.kind, list.build(), key.nullable);
+    DynamicRecordTypeImpl dynamicRecordType = new DynamicRecordTypeImpl(this);
+    dynamicRecordType.getFieldList().addAll(fieldListBuilder.build());
+    dynamicRecordType.computeDigest();
+    return dynamicRecordType;
   }
 
   private static final Map<Class, RelDataTypeFamily> CLASS_FAMILIES =
