@@ -143,9 +143,9 @@ public class ViewTableMacro implements TableMacro {
       if (viewTable == null) {
         final RelDataType rowType = parsed.rowType;
         final JavaTypeFactory typeFactory = (JavaTypeFactory) parsed.typeFactory;
-        final RelDataType dynamicRecordType = new DynamicRecordTypeImpl(typeFactory);
+        final DynamicRecordTypeImpl dynamicRecordType = new DynamicRecordTypeImpl(typeFactory);
         for (RelDataTypeField relDataTypeField : rowType.getFieldList()) {
-          dynamicRecordType.getField(relDataTypeField.getName(), true, false);
+          dynamicRecordType.getFieldList().add(relDataTypeField);
         }
         viewTable = new ViewTable(typeFactory.getJavaClass(dynamicRecordType), (factory) -> dynamicRecordType, viewSql, schemaPath, viewPath);
       }
