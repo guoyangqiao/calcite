@@ -1553,7 +1553,7 @@ class PredicateAnalyzer {
   private static RangeQueryBuilder addFormatIfNecessary(LiteralExpression literal,
                                                         RangeQueryBuilder rangeQueryBuilder) {
     if (literal.value() instanceof GregorianCalendar) {
-      rangeQueryBuilder.format("date_time");
+      rangeQueryBuilder.format("epoch_millis");
     }
     return rangeQueryBuilder;
   }
