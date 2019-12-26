@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.BoolQueryBuilder;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.QueryBuilder;
 import org.apache.calcite.adapter.elasticsearch.QueryBuilders.RangeQueryBuilder;
+import org.apache.calcite.avatica.util.TimeUnit;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
@@ -46,6 +47,10 @@ import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.Pair;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -163,6 +168,7 @@ class PredicateAnalyzer {
     private final RelNode topNode;
     private final RelOptTable relOptTable;
     private final EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> predicationConditionMap;
+    private final FunctionImplements functionImplements;
 
     private Visitor(RelNode relNode, EnumMap<ConditionalReduction, ConditionalReduction.ConditionCollector> analyzePredicationMap) {
       super(true);
@@ -171,6 +177,7 @@ class PredicateAnalyzer {
       this.topNode = relNode;
       this.relOptTable = tables.get(0);
       this.predicationConditionMap = analyzePredicationMap;
+      this.functionImplements = new FunctionImplements(this);
     }
 
     public Expression visitSubQuery(RexSubQuery subQuery) {
@@ -652,38 +659,7 @@ class PredicateAnalyzer {
               throw new PredicateAnalyzerException(message);
           }
         case FUNCTION:
-          if (call.getOperator().getName().equalsIgnoreCase("MATCHES_ANY")) {
-            List<RexNode> operands = call.getOperands();
-            RexNode node = operands.get(0);
-            Expression accept = node.accept(this);
-            List<String> matches = new ArrayList<>();
-            RexShuttle literalVisitor = new RexShuttle() {
-              @Override
-              public RexNode visitLiteral(RexLiteral literal) {
-                matches.add(literal.getValueAs(String.class));
-                return super.visitLiteral(literal);
-              }
-            };
-            for (int i = 1; i < operands.size(); i++) {
-              RexNode node1 = operands.get(i);
-              node1.accept(literalVisitor);
-            }
-            RexBuilder rexBuilder = topNode.getCluster().getRexBuilder();
-            return QueryExpression
-                .create(CastExpression.unpack((TerminalExpression) accept))
-                .match(new LiteralExpression(rexBuilder.makeLiteral(String.join(ElasticsearchConstants.WHITE_SPACE, matches))), ElasticsearchConstants.OR, 1);
-          }
-          if (call.getOperator().getName().equalsIgnoreCase("CONTAINS")) {
-            List<Expression> operands = new ArrayList<>();
-            for (RexNode node : call.getOperands()) {
-              final Expression nodeExpr = node.accept(this);
-              operands.add(nodeExpr);
-            }
-            String query = convertQueryString(operands.subList(0, operands.size() - 1),
-                operands.get(operands.size() - 1));
-            return QueryExpression.create(new NamedFieldExpression()).queryString(query);
-          }
-          // fall through
+          return functionImplements.handle(call);
         default:
           String message = format(Locale.ROOT, "Unsupported syntax [%s] for call: [%s]",
               syntax, call);
@@ -1040,6 +1016,84 @@ class PredicateAnalyzer {
       }
       return false;
     }
+
+    class FunctionImplements {
+      private final Visitor visitor;
+
+      public FunctionImplements(Visitor visitor) {
+        this.visitor = visitor;
+      }
+
+      Expression handle(RexCall call) {
+        SqlOperator operator = call.getOperator();
+        String funcName = operator.getName();
+        String s = funcName.toLowerCase(Locale.getDefault());
+        boolean nextUpper = true;
+        StringBuilder sb = new StringBuilder();
+        for (char c : s.toCharArray()) {
+          if (nextUpper) {
+            sb.append((char) (c - ('a' - 'A')));
+            nextUpper = false;
+          } else {
+            nextUpper = '_' == c;
+            if (!nextUpper) {
+              sb.append(c);
+            }
+          }
+        }
+        String camelCase = sb.toString();
+        String name = "handle" + camelCase;
+        try {
+          return (Expression) MethodHandles.lookup().findVirtual(FunctionImplements.class, name, MethodType.methodType(Expression.class, RexCall.class)).invoke(this, call);
+        } catch (Throwable throwable) {
+          throw new RuntimeException("Unable to find method " + camelCase, throwable);
+        }
+      }
+
+      Expression handleMatchesAny(RexCall call) {
+        List<RexNode> operands = call.getOperands();
+        RexNode node = operands.get(0);
+        PredicateAnalyzer.Expression accept = node.accept(visitor);
+        List<String> matches = new ArrayList<>();
+        RexShuttle literalVisitor = new RexShuttle() {
+          @Override
+          public RexNode visitLiteral(RexLiteral literal) {
+            matches.add(literal.getValueAs(String.class));
+            return super.visitLiteral(literal);
+          }
+        };
+        for (int i = 1; i < operands.size(); i++) {
+          RexNode node1 = operands.get(i);
+          node1.accept(literalVisitor);
+        }
+        RexBuilder rexBuilder = topNode.getCluster().getRexBuilder();
+        return QueryExpression
+            .create(CastExpression.unpack((TerminalExpression) accept))
+            .match(new PredicateAnalyzer.LiteralExpression(rexBuilder.makeLiteral(String.join(ElasticsearchConstants.WHITE_SPACE, matches))), ElasticsearchConstants.OR, 1);
+      }
+
+      Expression handleDateAdd(RexCall call) {
+        List<RexNode> operands = call.getOperands();
+        RexNode unitNode = operands.get(0);
+        assert unitNode instanceof RexLiteral;
+        final BigDecimal multiplier = ((RexLiteral) unitNode).getValueAs(TimeUnit.class).multiplier;
+        RexNode amountNode = operands.get(1);
+        assert amountNode instanceof RexLiteral;
+        final BigDecimal amount = ((RexLiteral) amountNode).getValueAs(BigDecimal.class);
+        final BigDecimal mills = amount.multiply(multiplier);
+        RexNode anchorNode = operands.get(2);
+        assert anchorNode instanceof RexCall;
+        SqlOperator anchorFunc = ((RexCall) anchorNode).getOperator();
+        if (anchorFunc == SqlStdOperatorTable.LOCALTIMESTAMP) {
+          RexBuilder rexBuilder = topNode.getCluster().getRexBuilder();
+          return new LiteralExpression(rexBuilder.makeLiteral(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault(Locale.Category.FORMAT)).format(new BigDecimal(System.currentTimeMillis()).add(mills).longValueExact())));
+        } else {
+          throw new PredicateAnalyzerException(anchorFunc.getName() + " not implemented");
+        }
+      }
+
+    }
+
   }
 
   private static ElasticsearchRel.Implementor implementRel(ElasticsearchRel bestExp) {
@@ -1100,6 +1154,8 @@ class PredicateAnalyzer {
     public abstract QueryExpression lte(LiteralExpression literal);
 
     public abstract QueryExpression match(LiteralExpression literal, String operator, int minimum);
+
+    public abstract QueryExpression in(String field, Collection<LiteralExpression> literal);
 
     public abstract QueryExpression queryString(String query);
 
@@ -1298,6 +1354,12 @@ class PredicateAnalyzer {
     }
 
     @Override
+    public QueryExpression in(String field, Collection<LiteralExpression> literal) {
+      throw new PredicateAnalyzerException("SqlOperatorImpl ['in'] "
+          + "cannot be applied to a compound expression");
+    }
+
+    @Override
     public QueryExpression queryString(String query) {
       throw new PredicateAnalyzerException("QueryString "
           + "cannot be applied to a compound expression");
@@ -1447,6 +1509,12 @@ class PredicateAnalyzer {
     @Override
     public QueryExpression match(LiteralExpression literal, String operator, int minimum) {
       builder = QueryBuilders.matchQuery(getFieldReference(), literal.stringValue(), operator, minimum);
+      return this;
+    }
+
+    @Override
+    public QueryExpression in(String field, Collection<LiteralExpression> literal) {
+      builder = QueryBuilders.termsQuery(field, literal.stream().map(x -> x.literal.getValue()).collect(Collectors.toList()));
       return this;
     }
 
