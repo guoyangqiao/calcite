@@ -600,13 +600,19 @@ class PredicateAnalyzer {
 
     @Override
     public Expression visitFieldAccess(RexFieldAccess fieldAccess) {
-      RexNode referenceExpr = fieldAccess.getReferenceExpr();
-      Expression accept = referenceExpr.accept(this);
-      assert accept instanceof TerminalExpression;
-      RelDataTypeField field = fieldAccess.getField();
-      RexBuilder rexBuilder = topNode.getCluster().getRexBuilder();
-      NamedFieldExpression namedFieldExpression = new NamedFieldExpression(rexBuilder.makeLiteral("" + "." + field.getName()));
-      throw new RuntimeException("TODO");
+      Expression inputExpression = fieldAccess.getReferenceExpr().accept(this);
+      if (inputExpression instanceof TerminalExpression) {
+        if (CastExpression.isCastExpression(inputExpression)) {
+          TerminalExpression inputTerminal = CastExpression.unpack((TerminalExpression) inputExpression);
+          if (inputTerminal instanceof NamedFieldExpression) {
+            String rootName = ((NamedFieldExpression) inputTerminal).getRootName();
+            RexBuilder rexBuilder = topNode.getCluster().getRexBuilder();
+            return new NamedFieldExpression(rexBuilder.makeLiteral(rootName + "." + fieldAccess.getField().getName()));
+          }
+        }
+      }
+      //Fall back
+      return super.visitFieldAccess(fieldAccess);
     }
 
     @Override
