@@ -608,7 +608,7 @@ class PredicateAnalyzer {
             String rootName = ((NamedFieldExpression) inputTerminal).getRootName();
             Map<String, ElasticsearchMapping.Datatype> mapping = relOptTable.unwrap(ElasticsearchTable.class).transport.mapping.mapping();
             ElasticsearchMapping.Datatype datatype = mapping.get(rootName);
-            if ("join".equalsIgnoreCase(datatype.name())) {
+            if (JOIN_TYPE.equalsIgnoreCase(datatype.name())) {
               //If it is a join type field, return parent expression
               return inputTerminal;
             }
