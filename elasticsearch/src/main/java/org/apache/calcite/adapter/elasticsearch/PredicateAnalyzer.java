@@ -868,7 +868,7 @@ class PredicateAnalyzer {
           }
           return QueryExpression.create(pair.getKey()).lte(pair.getValue());
         case IN:
-          QueryExpression.create((TerminalExpression) operands.get(0).accept(this)).in(oneToEndIteration(operands, c -> new LiteralExpression((RexLiteral) c)));
+          return QueryExpression.create((TerminalExpression) operands.get(0).accept(this)).in(oneToEndIteration(operands, c -> new LiteralExpression((RexLiteral) c)));
         default:
           break;
       }
