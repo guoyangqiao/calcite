@@ -1172,9 +1172,10 @@ class PredicateAnalyzer {
     public abstract QueryExpression isTrue();
 
     public static QueryExpression create(TerminalExpression expression) {
-
       if (expression instanceof NamedFieldExpression) {
         return new SimpleQueryExpression((NamedFieldExpression) expression);
+      } else if (CastExpression.isCastExpression(expression)) {
+        return create(CastExpression.unpack(expression));
       } else {
         String message = String.format(Locale.ROOT, "Unsupported expression: [%s]", expression);
         throw new PredicateAnalyzerException(message);
