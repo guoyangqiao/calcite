@@ -3,6 +3,7 @@ package org.apache.calcite.sql.fun;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.*;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.util.HashSet;
 import java.util.List;
@@ -12,9 +13,8 @@ public class SqlMatchesAnyFunction extends SqlFunction {
 
   private static final SqlReturnTypeInference RETURN_TYPE_INFERENCE =
       opBinding -> {
-        //TODO operand type check
         final RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
-        return typeFactory.createJavaType(boolean.class);
+        return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
       };
 
   public SqlMatchesAnyFunction() {
