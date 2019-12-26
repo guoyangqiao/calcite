@@ -100,7 +100,9 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
 
   //~ Constructors -----------------------------------------------------------
 
-  /** Creates a type factory. */
+  /**
+   * Creates a type factory.
+   */
   protected RelDataTypeFactoryImpl(RelDataTypeSystem typeSystem) {
     this.typeSystem = Objects.requireNonNull(typeSystem);
   }
@@ -593,7 +595,9 @@ public abstract class RelDataTypeFactoryImpl implements RelDataTypeFactory {
     }
   }
 
-  /** Key to the data type cache. */
+  /**
+   * Key to the data type cache.
+   */
   private static class Key {
     private final StructKind kind;
     private final List<String> names;
