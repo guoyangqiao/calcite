@@ -25,7 +25,7 @@ public class DynamicFieldType extends RelDataTypeImpl {
     computeDigest();
   }
 
-  DynamicFieldType(DynamicRecordType relayType, RelDataType endPointType) {
+  public DynamicFieldType(DynamicRecordType relayType, RelDataType endPointType) {
     this.relayType = relayType;
     this.endPointType = endPointType;
     switchToEndPoint();

@@ -122,6 +122,8 @@ public class ViewTableMacro implements TableMacro {
    */
   static class DynamicRowTypeViewTableMarco extends ViewTableMacro {
 
+    private ViewTable viewTable;
+
     /**
      * Creates a ViewTableMacro. This marco override viewTable so we can get dynamic row type
      *
@@ -138,13 +140,16 @@ public class ViewTableMacro implements TableMacro {
 
     @Override
     protected ViewTable viewTable(CalcitePrepare.AnalyzeViewResult parsed, String viewSql, List<String> schemaPath, List<String> viewPath) {
-      final RelDataType rowType = parsed.rowType;
-      final JavaTypeFactory typeFactory = (JavaTypeFactory) parsed.typeFactory;
-      final RelDataType dynamicRecordType = new DynamicRecordTypeImpl(typeFactory);
-      //Fulfill origin row fields
-      List<RelDataTypeField> fieldList = dynamicRecordType.getFieldList();
-      fieldList.addAll(rowType.getFieldList());
-      return new ViewTable(typeFactory.getJavaClass(dynamicRecordType), RelDataTypeImpl.proto(dynamicRecordType), viewSql, schemaPath, viewPath);
+      if (viewTable == null) {
+        final RelDataType rowType = parsed.rowType;
+        final JavaTypeFactory typeFactory = (JavaTypeFactory) parsed.typeFactory;
+        final RelDataType dynamicRecordType = new DynamicRecordTypeImpl(typeFactory);
+        for (RelDataTypeField relDataTypeField : rowType.getFieldList()) {
+          dynamicRecordType.getField(relDataTypeField.getName(), true, false);
+        }
+        viewTable = new ViewTable(typeFactory.getJavaClass(dynamicRecordType), (factory) -> dynamicRecordType, viewSql, schemaPath, viewPath);
+      }
+      return viewTable;
     }
   }
 

@@ -21,19 +21,10 @@ import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.linq4j.Ord;
 import org.apache.calcite.linq4j.tree.Primitive;
 import org.apache.calcite.linq4j.tree.Types;
-import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
-import org.apache.calcite.rel.type.RelDataTypeSystem;
-import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.rel.type.*;
 import org.apache.calcite.runtime.GeoFunctions;
 import org.apache.calcite.runtime.Unit;
-import org.apache.calcite.sql.type.BasicSqlType;
-import org.apache.calcite.sql.type.IntervalSqlType;
-import org.apache.calcite.sql.type.JavaToSqlTypeConversionRules;
-import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
-import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.type.*;
 import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Util;
 
@@ -41,12 +32,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
-import java.util.AbstractList;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -137,10 +123,10 @@ public class JavaTypeFactoryImpl
     }
     final Class clazz = (Class) type;
     switch (Primitive.flavor(clazz)) {
-    case PRIMITIVE:
-      return createJavaType(clazz);
-    case BOX:
-      return createJavaType(Primitive.ofBox(clazz).boxClass);
+      case PRIMITIVE:
+        return createJavaType(clazz);
+      case BOX:
+        return createJavaType(Primitive.ofBox(clazz).boxClass);
     }
     if (JavaToSqlTypeConversionRules.instance().lookup(clazz) != null) {
       return createJavaType(clazz);
@@ -166,68 +152,68 @@ public class JavaTypeFactoryImpl
     }
     if (type instanceof BasicSqlType || type instanceof IntervalSqlType) {
       switch (type.getSqlTypeName()) {
-      case VARCHAR:
-      case CHAR:
-        return String.class;
-      case DATE:
-      case TIME:
-      case TIME_WITH_LOCAL_TIME_ZONE:
-      case INTEGER:
-      case INTERVAL_YEAR:
-      case INTERVAL_YEAR_MONTH:
-      case INTERVAL_MONTH:
-        return type.isNullable() ? Integer.class : int.class;
-      case TIMESTAMP:
-      case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-      case BIGINT:
-      case INTERVAL_DAY:
-      case INTERVAL_DAY_HOUR:
-      case INTERVAL_DAY_MINUTE:
-      case INTERVAL_DAY_SECOND:
-      case INTERVAL_HOUR:
-      case INTERVAL_HOUR_MINUTE:
-      case INTERVAL_HOUR_SECOND:
-      case INTERVAL_MINUTE:
-      case INTERVAL_MINUTE_SECOND:
-      case INTERVAL_SECOND:
-        return type.isNullable() ? Long.class : long.class;
-      case SMALLINT:
-        return type.isNullable() ? Short.class : short.class;
-      case TINYINT:
-        return type.isNullable() ? Byte.class : byte.class;
-      case DECIMAL:
-        return BigDecimal.class;
-      case BOOLEAN:
-        return type.isNullable() ? Boolean.class : boolean.class;
-      case DOUBLE:
-      case FLOAT: // sic
-        return type.isNullable() ? Double.class : double.class;
-      case REAL:
-        return type.isNullable() ? Float.class : float.class;
-      case BINARY:
-      case VARBINARY:
-        return ByteString.class;
-      case GEOMETRY:
-        return GeoFunctions.Geom.class;
-      case SYMBOL:
-        return Enum.class;
-      case ANY:
-        return Object.class;
+        case VARCHAR:
+        case CHAR:
+          return String.class;
+        case DATE:
+        case TIME:
+        case TIME_WITH_LOCAL_TIME_ZONE:
+        case INTEGER:
+        case INTERVAL_YEAR:
+        case INTERVAL_YEAR_MONTH:
+        case INTERVAL_MONTH:
+          return type.isNullable() ? Integer.class : int.class;
+        case TIMESTAMP:
+        case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+        case BIGINT:
+        case INTERVAL_DAY:
+        case INTERVAL_DAY_HOUR:
+        case INTERVAL_DAY_MINUTE:
+        case INTERVAL_DAY_SECOND:
+        case INTERVAL_HOUR:
+        case INTERVAL_HOUR_MINUTE:
+        case INTERVAL_HOUR_SECOND:
+        case INTERVAL_MINUTE:
+        case INTERVAL_MINUTE_SECOND:
+        case INTERVAL_SECOND:
+          return type.isNullable() ? Long.class : long.class;
+        case SMALLINT:
+          return type.isNullable() ? Short.class : short.class;
+        case TINYINT:
+          return type.isNullable() ? Byte.class : byte.class;
+        case DECIMAL:
+          return BigDecimal.class;
+        case BOOLEAN:
+          return type.isNullable() ? Boolean.class : boolean.class;
+        case DOUBLE:
+        case FLOAT: // sic
+          return type.isNullable() ? Double.class : double.class;
+        case REAL:
+          return type.isNullable() ? Float.class : float.class;
+        case BINARY:
+        case VARBINARY:
+          return ByteString.class;
+        case GEOMETRY:
+          return GeoFunctions.Geom.class;
+        case SYMBOL:
+          return Enum.class;
+        case ANY:
+          return Object.class;
       }
     }
     switch (type.getSqlTypeName()) {
-    case ROW:
-      assert type instanceof RelRecordType;
-      if (type instanceof JavaRecordType) {
-        return ((JavaRecordType) type).clazz;
-      } else {
-        return createSyntheticType((RelRecordType) type);
-      }
-    case MAP:
-      return Map.class;
-    case ARRAY:
-    case MULTISET:
-      return List.class;
+      case ROW:
+        assert type instanceof RelRecordType || type instanceof DynamicRecordType;
+        if (type instanceof JavaRecordType) {
+          return ((JavaRecordType) type).clazz;
+        } else {
+          return createSyntheticType(type);
+        }
+      case MAP:
+        return Map.class;
+      case ARRAY:
+      case MULTISET:
+        return List.class;
     }
     return null;
   }
@@ -238,7 +224,7 @@ public class JavaTypeFactoryImpl
 
   /** Converts a type in Java format to a SQL-oriented type. */
   public static RelDataType toSql(final RelDataTypeFactory typeFactory,
-      RelDataType type) {
+                                  RelDataType type) {
     if (type instanceof RelRecordType) {
       return typeFactory.createTypeWithNullability(
           typeFactory.createStructType(
@@ -303,7 +289,7 @@ public class JavaTypeFactoryImpl
 
   /** Creates a synthetic Java class whose fields have the same names and
    * relational types. */
-  private Type createSyntheticType(RelRecordType type) {
+  private Type createSyntheticType(RelDataType type) {
     final String name =
         "Record" + type.getFieldCount() + "_" + syntheticTypes.size();
     final SyntheticRecordType syntheticType =
@@ -332,7 +318,7 @@ public class JavaTypeFactoryImpl
       this.relType = relType;
       this.name = name;
       assert relType == null
-             || Util.isDistinct(relType.getFieldNames())
+          || Util.isDistinct(relType.getFieldNames())
           : "field names not distinct: " + relType;
     }
 
