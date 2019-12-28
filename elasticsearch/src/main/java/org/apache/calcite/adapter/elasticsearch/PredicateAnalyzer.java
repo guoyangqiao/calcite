@@ -178,7 +178,7 @@ class PredicateAnalyzer {
       this.topNode = relNode;
       this.relOptTable = tables.get(0);
       this.predicationConditionMap = analyzePredicationMap;
-      this.functionImplements = new FunctionImplements(this);
+      this.functionImplements = new FunctionImplements();
     }
 
     public Expression visitSubQuery(RexSubQuery subQuery) {
@@ -1028,11 +1028,6 @@ class PredicateAnalyzer {
     }
 
     class FunctionImplements {
-      private final Visitor visitor;
-
-      public FunctionImplements(Visitor visitor) {
-        this.visitor = visitor;
-      }
 
       Expression handle(RexCall call) {
         SqlOperator operator = call.getOperator();
@@ -1063,7 +1058,7 @@ class PredicateAnalyzer {
       Expression handleMatchesAny(RexCall call) {
         List<RexNode> operands = call.getOperands();
         RexNode node = operands.get(0);
-        PredicateAnalyzer.Expression accept = node.accept(visitor);
+        PredicateAnalyzer.Expression accept = node.accept(Visitor.this);
         List<String> matches = new ArrayList<>();
         RexShuttle literalVisitor = new RexShuttle() {
           @Override
