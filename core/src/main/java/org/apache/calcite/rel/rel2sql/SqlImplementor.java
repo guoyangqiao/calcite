@@ -1053,7 +1053,12 @@ public abstract class SqlImplementor {
             Doesn't return 'AS' detail but just alias
              */
 //              return ((SqlCall) selectItem).operand(1);
-            return selectList.get(ordinal);
+            SqlNode sqlNode = selectList.get(ordinal);
+            if (sqlNode instanceof SqlCall) {
+              return ((SqlCall) sqlNode).operand(1);
+            } else {
+              return sqlNode;
+            }
           }
         };
       } else {
