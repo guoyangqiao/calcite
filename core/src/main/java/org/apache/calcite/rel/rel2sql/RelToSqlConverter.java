@@ -204,7 +204,7 @@ public class RelToSqlConverter extends SqlImplementor
 
     final List<SqlNode> groupKeys = new ArrayList<>();
     for (int key : groupList) {
-      final SqlNode field = builder.context.field(key);
+      final SqlNode field = builder.context.field(key, false);
       if (field.getKind() == SqlKind.AS) {
         //If group by an alias, keep using alias
         groupKeys.add(((SqlCall) field).operand(1));
