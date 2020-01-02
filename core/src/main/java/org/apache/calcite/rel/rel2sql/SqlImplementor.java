@@ -424,6 +424,16 @@ public abstract class SqlImplementor {
 
     public abstract SqlNode field(int ordinal);
 
+    /**
+     * return field of the ordinal, implements may override
+     *
+     * @param ordinal  field ordinal
+     * @param unwrapAs true will unwrap AS if exists and return the left operand
+     */
+    public SqlNode field(int ordinal, boolean unwrapAs) {
+      return field(ordinal);
+    }
+
     /** Converts an expression from {@link RexNode} to {@link SqlNode}
      * format.
      *
@@ -821,7 +831,10 @@ public abstract class SqlImplementor {
 
     /** Converts a collation to an ORDER BY item. */
     public SqlNode toSql(RelFieldCollation collation) {
-      SqlNode node = field(collation.getFieldIndex());
+      SqlNode node = field(collation.getFieldIndex(), false);
+      if (node.getKind() == SqlKind.AS) {
+        node = ((SqlCall) node).operand(1);
+      }
       switch (collation.getDirection()) {
       case DESCENDING:
       case STRICTLY_DESCENDING:
@@ -1054,6 +1067,15 @@ public abstract class SqlImplementor {
                 return ((SqlCall) selectItem).operand(0);
             }
             return selectItem;
+          }
+
+          @Override
+          public SqlNode field(int ordinal, boolean unwrapAs) {
+            if (unwrapAs) {
+              return field(ordinal);
+            } else {
+              return selectList.get(ordinal);
+            }
           }
         };
       } else {
