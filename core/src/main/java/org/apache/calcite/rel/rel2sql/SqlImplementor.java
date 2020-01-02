@@ -1048,17 +1048,12 @@ public abstract class SqlImplementor {
       if (selectList != null) {
         newContext = new Context(dialect, selectList.size()) {
           public SqlNode field(int ordinal) {
-            /*
-            Modified by GYQ on 2019-11-05 11:32:11, since generated sql will be parsed for a second time, will generate as original as possible
-            Doesn't return 'AS' detail but just alias
-             */
-//              return ((SqlCall) selectItem).operand(1);
-            SqlNode sqlNode = selectList.get(ordinal);
-            if (sqlNode instanceof SqlCall) {
-              return ((SqlCall) sqlNode).operand(1);
-            } else {
-              return sqlNode;
+            final SqlNode selectItem = selectList.get(ordinal);
+            switch (selectItem.getKind()) {
+              case AS:
+                return ((SqlCall) selectItem).operand(0);
             }
+            return selectItem;
           }
         };
       } else {
