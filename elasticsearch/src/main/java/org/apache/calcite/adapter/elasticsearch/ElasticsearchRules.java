@@ -39,6 +39,8 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.StringWriter;
 import java.util.AbstractList;
@@ -57,6 +59,8 @@ class ElasticsearchRules {
       ElasticsearchProjectRule.INSTANCE,
       ElasticsearchAggregateRule.INSTANCE,
   };
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ElasticsearchRules.class);
 
   private ElasticsearchRules() {
   }
@@ -323,6 +327,7 @@ class ElasticsearchRules {
             agg.getGroupSets(),
             agg.getAggCallList());
       } catch (InvalidRelException e) {
+        LOGGER.error("Error while converting LogicalAggregate to ElasticsearchAggregate due to inappropriate parameters", e);
         return null;
       }
     }
