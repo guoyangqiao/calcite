@@ -337,12 +337,13 @@ public class AggregateCall {
         && (distinct == other.distinct)
         && argList.equals(other.argList)
         && filterArg == other.filterArg
+        && approximate == other.approximate
         && Objects.equals(collation, other.collation);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(aggFunction, distinct, argList, filterArg, collation);
+    return Objects.hash(aggFunction, distinct, approximate, argList, filterArg, collation);
   }
 
   /**
