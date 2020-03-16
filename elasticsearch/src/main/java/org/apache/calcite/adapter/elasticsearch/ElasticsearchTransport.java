@@ -62,7 +62,6 @@ import java.util.stream.StreamSupport;
 final class ElasticsearchTransport {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ElasticsearchTable.class);
-    public static Consumer<Object> BEFORE_REQUEST;
     static final int DEFAULT_FETCH_SIZE = 5196;
 
     private final ObjectMapper mapper;
@@ -214,7 +213,6 @@ final class ElasticsearchTransport {
                 final String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(query);
                 LOGGER.info("Elasticsearch Query:\n{}", json);
                 post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
-                BEFORE_REQUEST.accept(json);
             } catch (URISyntaxException e) {
                 throw new RuntimeException(e);
             } catch (JsonProcessingException e) {
