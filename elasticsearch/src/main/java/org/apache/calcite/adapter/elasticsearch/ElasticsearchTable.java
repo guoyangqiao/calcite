@@ -49,322 +49,335 @@ import java.util.stream.Collectors;
  */
 public class ElasticsearchTable extends AbstractQueryableTable implements TranslatableTable {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(ElasticsearchTable.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ElasticsearchTable.class);
 
-  /**
-   * Used for constructing (possibly nested) Elastic aggregation nodes.
-   */
-  private static final String AGGREGATIONS = "aggregations";
+    /**
+     * Used for constructing (possibly nested) Elastic aggregation nodes.
+     */
+    private static final String AGGREGATIONS = "aggregations";
 
-  private final ElasticsearchVersion version;
-  private final String indexName;
-  final ObjectMapper mapper;
-  final ElasticsearchTransport transport;
+    private final ElasticsearchVersion version;
+    private final String indexName;
+    final ObjectMapper mapper;
+    final ElasticsearchTransport transport;
 
-  /**
-   * Creates an ElasticsearchTable.
-   */
-  ElasticsearchTable(ElasticsearchTransport transport) {
-    super(Object[].class);
-    this.transport = Objects.requireNonNull(transport, "transport");
-    this.version = transport.version;
-    this.indexName = transport.indexName;
-    this.mapper = transport.mapper();
-  }
-
-  /**
-   * In ES 5.x scripted fields start with {@code params._source.foo} while in ES2.x
-   * {@code _source.foo}. Helper method to build correct query based on runtime version of elastic.
-   * Used to keep backwards compatibility with ES2.
-   *
-   * @see <a href="https://github.com/elastic/elasticsearch/issues/20068">_source variable</a>
-   * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/master/modules-scripting-fields.html">Scripted Fields</a>
-   * @return string to be used for scripted fields
-   */
-  String scriptedFieldPrefix() {
-    // ES2 vs ES5 scripted field difference
-    return version == ElasticsearchVersion.ES2
-        ? ElasticsearchConstants.SOURCE_GROOVY
-        : ElasticsearchConstants.SOURCE_PAINLESS;
-  }
-
-  /**
-   * Executes a "find" operation on the underlying index.
-   *
-   * @param ops List of operations represented as Json strings.
-   * @param fields List of fields to project; or null to return map
-   * @param sort list of fields to sort and their direction (asc/desc)
-   * @param aggregations aggregation functions
-   * @return Enumerator of results
-   */
-  private Enumerable<Object> find(List<String> ops,
-      List<Map.Entry<String, Class>> fields,
-      List<Map.Entry<String, RelFieldCollation.Direction>> sort,
-      List<String> groupBy,
-      List<Map.Entry<String, String>> aggregations,
-      Map<String, String> mappings,
-      Map<String, String> projectItemMappings,
-      Long offset, Long fetch) throws IOException {
-
-    if (!aggregations.isEmpty() || !groupBy.isEmpty()) {
-      // process aggregations separately
-      return aggregate(ops, fields, sort, groupBy, aggregations, mappings, projectItemMappings, offset, fetch);
+    /**
+     * Creates an ElasticsearchTable.
+     */
+    ElasticsearchTable(ElasticsearchTransport transport) {
+        super(Object[].class);
+        this.transport = Objects.requireNonNull(transport, "transport");
+        this.version = transport.version;
+        this.indexName = transport.indexName;
+        this.mapper = transport.mapper();
     }
 
-    final ObjectNode query = mapper.createObjectNode();
-    // manually parse from previously concatenated string
-    for (String op: ops) {
-      query.setAll((ObjectNode) mapper.readTree(op));
+    /**
+     * In ES 5.x scripted fields start with {@code params._source.foo} while in ES2.x
+     * {@code _source.foo}. Helper method to build correct query based on runtime version of elastic.
+     * Used to keep backwards compatibility with ES2.
+     *
+     * @return string to be used for scripted fields
+     * @see <a href="https://github.com/elastic/elasticsearch/issues/20068">_source variable</a>
+     * @see <a href="https://www.elastic.co/guide/en/elasticsearch/reference/master/modules-scripting-fields.html">Scripted Fields</a>
+     */
+    String scriptedFieldPrefix() {
+        // ES2 vs ES5 scripted field difference
+        return version == ElasticsearchVersion.ES2
+                ? ElasticsearchConstants.SOURCE_GROOVY
+                : ElasticsearchConstants.SOURCE_PAINLESS;
     }
 
-    if (!sort.isEmpty()) {
-      ArrayNode sortNode = query.withArray("sort");
-      sort.forEach(e ->
-          sortNode.add(
-              mapper.createObjectNode().put(e.getKey(),
-                  e.getValue().isDescending() ? "desc" : "asc")));
-    }
+    /**
+     * Executes a "find" operation on the underlying index.
+     *
+     * @param ops          List of operations represented as Json strings.
+     * @param fields       List of fields to project; or null to return map
+     * @param sort         list of fields to sort and their direction (asc/desc)
+     * @param aggregations aggregation functions
+     * @return Enumerator of results
+     */
+    private Enumerable<Object> find(List<String> ops,
+                                    List<Map.Entry<String, Class>> fields,
+                                    List<Map.Entry<String, RelFieldCollation.Direction>> sort,
+                                    List<String> groupBy,
+                                    List<Map.Entry<String, String>> aggregations,
+                                    Map<String, String> mappings,
+                                    Map<String, String> projectItemMappings,
+                                    Long offset, Long fetch) throws IOException {
 
-    if (offset != null) {
-      query.put("from", offset);
-    }
+        if (!aggregations.isEmpty() || !groupBy.isEmpty()) {
+            // process aggregations separately
+            return aggregate(ops, fields, sort, groupBy, aggregations, mappings, projectItemMappings, offset, fetch);
+        }
 
-    if (fetch != null) {
-      query.put("size", fetch);
-    }
+        final ObjectNode query = mapper.createObjectNode();
+        // manually parse from previously concatenated string
+        for (String op : ops) {
+            query.setAll((ObjectNode) mapper.readTree(op));
+        }
 
-    final Function1<ElasticsearchJson.SearchHit, Object> getter =
-        ElasticsearchEnumerators.getter(fields, ImmutableMap.copyOf(mappings));
+        if (!sort.isEmpty()) {
+            ArrayNode sortNode = query.withArray("sort");
+            sort.forEach(e ->
+                    sortNode.add(
+                            mapper.createObjectNode().put(e.getKey(),
+                                    e.getValue().isDescending() ? "desc" : "asc")));
+        }
 
-    Iterable<ElasticsearchJson.SearchHit> iter;
-    if (offset == null) {
-      // apply scrolling when there is no offsets
-      iter = () -> new Scrolling(transport).query(query);
-    } else {
-      final ElasticsearchJson.Result search = transport.search().apply(query);
-      iter = () -> search.searchHits().hits().iterator();
-    }
-
-    return Linq4j.asEnumerable(iter).select(getter);
-  }
-
-  private Enumerable<Object> aggregate(List<String> ops,
-      List<Map.Entry<String, Class>> fields,
-      List<Map.Entry<String, RelFieldCollation.Direction>> sort,
-      List<String> groupBy,
-      List<Map.Entry<String, String>> aggregations,
-      Map<String, String> mapping,
-      Map<String, String> projectItemMappings,
-      Long offset, Long fetch) throws IOException {
-
-    if (!groupBy.isEmpty() && offset != null) {
-      String message = "Currently ES doesn't support generic pagination "
-          + "with aggregations. You can still use LIMIT keyword (without OFFSET). "
-          + "For more details see https://github.com/elastic/elasticsearch/issues/4915";
-      throw new IllegalStateException(message);
-    }
-
-    final ObjectNode query = mapper.createObjectNode();
-    // manually parse into JSON from previously concatenated strings
-    for (String op: ops) {
-      query.setAll((ObjectNode) mapper.readTree(op));
-    }
-
-    // remove / override attributes which are not applicable to aggregations
-    query.put("_source", false);
-    query.put("size", 0);
-    query.remove("script_fields");
-
-    // allows to detect aggregation for count(*)
-    final Predicate<Map.Entry<String, String>> isCountStar = e -> e.getValue()
-            .contains("\"" + ElasticsearchConstants.ID + "\"");
-
-    // list of expressions which are count(*)
-    final Set<String> countAll = aggregations.stream()
-            .filter(isCountStar)
-        .map(Map.Entry::getKey).collect(Collectors.toSet());
-
-    final Map<String, String> fieldMap = new HashMap<>();
-
-    // due to ES aggregation format. fields in "order by" clause should go first
-    // if "order by" is missing. order in "group by" is un-important
-    final Set<String> orderedGroupBy = new LinkedHashSet<>();
-    orderedGroupBy.addAll(sort.stream().map(Map.Entry::getKey).collect(Collectors.toList()));
-    orderedGroupBy.addAll(groupBy);
-
-    // construct nested aggregations node(s)
-    ObjectNode parent = query.with(AGGREGATIONS);
-    for (String name: orderedGroupBy) {
-      final String aggName = "g_" + name;
-      fieldMap.put(aggName, name);
-      final ObjectNode section = parent.with(aggName);
-      String projectionItem;
-      //Added by GYQ, the projection may generate new field, so will it be used in aggregation
-      if ((projectionItem = projectItemMappings.get(name)) != null) {
-        final JsonNode projectNode = mapper.readTree(projectionItem);
-        assert  projectNode instanceof  ObjectNode;
-        section.setAll((ObjectNode) projectNode);
-      } else {
-        final ObjectNode terms = section.with("terms");
-        terms.put("field", name);
-
-        transport.mapping.missingValueFor(name).ifPresent(m -> {
-          // expose missing terms. each type has a different missing value
-          terms.set("missing", m);
-        });
+        if (offset != null) {
+            query.put("from", offset);
+        }
 
         if (fetch != null) {
-          terms.put("size", fetch);
+            query.put("size", fetch);
         }
 
-        sort.stream().filter(e -> e.getKey().equals(name)).findAny()
-            .ifPresent(s ->
-                terms.with("order")
-                    .put("_key", s.getValue().isDescending() ? "desc" : "asc"));
-      }
-      parent = section.with(AGGREGATIONS);
-    }
+        final Function1<ElasticsearchJson.SearchHit, Object> getter =
+                ElasticsearchEnumerators.getter(fields, ImmutableMap.copyOf(mappings));
 
-    // simple version for queries like "select count(*), max(col1) from table" (no GROUP BY cols)
-    if (!groupBy.isEmpty() || !aggregations.stream().allMatch(isCountStar)) {
-      for (Map.Entry<String, String> aggregation : aggregations) {
-        JsonNode value = mapper.readTree(aggregation.getValue());
-        parent.set(aggregation.getKey(), value);
-      }
-    }
-
-    final Consumer<JsonNode> emptyAggRemover = new Consumer<JsonNode>() {
-      @Override public void accept(JsonNode node) {
-        if (!node.has(AGGREGATIONS)) {
-          node.elements().forEachRemaining(this);
-          return;
-        }
-        JsonNode agg = node.get(AGGREGATIONS);
-        if (agg.size() == 0) {
-          ((ObjectNode) node).remove(AGGREGATIONS);
+        Iterable<ElasticsearchJson.SearchHit> iter;
+        if (offset == null) {
+            // apply scrolling when there is no offsets
+            iter = () -> new Scrolling(transport).query(query);
         } else {
-          this.accept(agg);
+            final ElasticsearchJson.Result search = transport.search().apply(query);
+            iter = () -> search.searchHits().hits().iterator();
         }
-      }
-    };
 
-    // cleanup query. remove empty AGGREGATIONS element (if empty)
-    emptyAggRemover.accept(query);
-
-    // This must be set to true or else in 7.X and 6/7 mixed clusters
-    // will return lower bounded count values instead of an accurate count.
-    if (groupBy.isEmpty()
-        && version.elasticVersionMajor() >= ElasticsearchVersion.ES6.elasticVersionMajor()) {
-      query.put("track_total_hits", true);
+        return Linq4j.asEnumerable(iter).select(getter);
     }
 
-    ElasticsearchJson.Result res = transport.search(Collections.emptyMap()).apply(query);
+    private Enumerable<Object> aggregate(List<String> ops,
+                                         List<Map.Entry<String, Class>> fields,
+                                         List<Map.Entry<String, RelFieldCollation.Direction>> sort,
+                                         List<String> groupBy,
+                                         List<Map.Entry<String, String>> aggregations,
+                                         Map<String, String> mapping,
+                                         Map<String, String> projectItemMappings,
+                                         Long offset, Long fetch) throws IOException {
 
-    final List<Map<String, Object>> result = new ArrayList<>();
-    if (res.aggregations() != null) {
-      // collect values
-      ElasticsearchJson.visitValueNodes(res.aggregations(), m -> {
-        // using 'Collectors.toMap' will trigger Java 8 bug here
-        Map<String, Object> newMap = new LinkedHashMap<>();
-        for (String key: m.keySet()) {
-          newMap.put(fieldMap.getOrDefault(key, key), m.get(key));
+        if (!groupBy.isEmpty() && offset != null) {
+            String message = "Currently ES doesn't support generic pagination "
+                    + "with aggregations. You can still use LIMIT keyword (without OFFSET). "
+                    + "For more details see https://github.com/elastic/elasticsearch/issues/4915";
+            throw new IllegalStateException(message);
         }
-        result.add(newMap);
-      });
-    } else {
-      // probably no group by. add single result
-      result.add(new LinkedHashMap<>());
+
+        final ObjectNode query = mapper.createObjectNode();
+        // manually parse into JSON from previously concatenated strings
+        for (String op : ops) {
+            query.setAll((ObjectNode) mapper.readTree(op));
+        }
+
+        // remove / override attributes which are not applicable to aggregations
+        query.put("_source", false);
+        query.put("size", 0);
+        query.remove("script_fields");
+
+        // allows to detect aggregation for count(*)
+        final Predicate<Map.Entry<String, String>> isCountStar = e -> e.getValue()
+                .contains("\"" + ElasticsearchConstants.ID + "\"");
+
+        // list of expressions which are count(*)
+        final Set<String> countAll = aggregations.stream()
+                .filter(isCountStar)
+                .map(Map.Entry::getKey).collect(Collectors.toSet());
+
+        final Map<String, String> fieldMap = new HashMap<>();
+
+        // due to ES aggregation format. fields in "order by" clause should go first
+        // if "order by" is missing. order in "group by" is un-important
+        final Set<String> orderedGroupBy = new LinkedHashSet<>();
+        orderedGroupBy.addAll(sort.stream().map(Map.Entry::getKey).collect(Collectors.toList()));
+        orderedGroupBy.addAll(groupBy);
+
+        // construct nested aggregations node(s)
+        ObjectNode parent = query.with(AGGREGATIONS);
+        for (String name : orderedGroupBy) {
+            final String aggName = "g_" + name;
+            fieldMap.put(aggName, name);
+            final ObjectNode section = parent.with(aggName);
+            String projectionItem;
+            //Added by GYQ, the projection may generate new field, so will it be used in aggregation
+            if ((projectionItem = projectItemMappings.get(name)) != null) {
+                final JsonNode projectNode = mapper.readTree(projectionItem);
+                assert projectNode instanceof ObjectNode;
+                section.setAll((ObjectNode) projectNode);
+            } else {
+                final ObjectNode terms = section.with("terms");
+                terms.put("field", name);
+
+                try {
+                    transport.mapping.missingValueFor(name).ifPresent(m -> {
+                        // expose missing terms. each type has a different missing value
+                        terms.set("missing", m);
+                    });
+                } catch (IllegalArgumentException t) {
+                    LOGGER.warn("Filed missing value missing", t);
+                    //Now should define missing value by name definition
+                    terms.put("missing", "N/A");
+                }
+
+                if (fetch != null) {
+                    terms.put("size", fetch);
+                }
+
+                sort.stream().filter(e -> e.getKey().equals(name)).findAny()
+                        .ifPresent(s ->
+                                terms.with("order")
+                                        .put("_key", s.getValue().isDescending() ? "desc" : "asc"));
+            }
+            parent = section.with(AGGREGATIONS);
+        }
+
+        // simple version for queries like "select count(*), max(col1) from table" (no GROUP BY cols)
+        if (!groupBy.isEmpty() || !aggregations.stream().allMatch(isCountStar)) {
+            for (Map.Entry<String, String> aggregation : aggregations) {
+                JsonNode value = mapper.readTree(aggregation.getValue());
+                parent.set(aggregation.getKey(), value);
+            }
+        }
+
+        final Consumer<JsonNode> emptyAggRemover = new Consumer<JsonNode>() {
+            @Override
+            public void accept(JsonNode node) {
+                if (!node.has(AGGREGATIONS)) {
+                    node.elements().forEachRemaining(this);
+                    return;
+                }
+                JsonNode agg = node.get(AGGREGATIONS);
+                if (agg.size() == 0) {
+                    ((ObjectNode) node).remove(AGGREGATIONS);
+                } else {
+                    this.accept(agg);
+                }
+            }
+        };
+
+        // cleanup query. remove empty AGGREGATIONS element (if empty)
+        emptyAggRemover.accept(query);
+
+        // This must be set to true or else in 7.X and 6/7 mixed clusters
+        // will return lower bounded count values instead of an accurate count.
+        if (groupBy.isEmpty()
+                && version.elasticVersionMajor() >= ElasticsearchVersion.ES6.elasticVersionMajor()) {
+            query.put("track_total_hits", true);
+        }
+
+        ElasticsearchJson.Result res = transport.search(Collections.emptyMap()).apply(query);
+
+        final List<Map<String, Object>> result = new ArrayList<>();
+        if (res.aggregations() != null) {
+            // collect values
+            ElasticsearchJson.visitValueNodes(res.aggregations(), m -> {
+                // using 'Collectors.toMap' will trigger Java 8 bug here
+                Map<String, Object> newMap = new LinkedHashMap<>();
+                for (String key : m.keySet()) {
+                    newMap.put(fieldMap.getOrDefault(key, key), m.get(key));
+                }
+                result.add(newMap);
+            });
+        } else {
+            // probably no group by. add single result
+            result.add(new LinkedHashMap<>());
+        }
+
+        // elastic exposes total number of documents matching a query in "/hits/total" path
+        // this can be used for simple "select count(*) from table"
+        final long total = res.searchHits().total().value();
+
+        if (groupBy.isEmpty()) {
+            // put totals automatically for count(*) expression(s), unless they contain group by
+            for (String expr : countAll) {
+                result.forEach(m -> m.put(expr, total));
+            }
+        }
+
+        final Function1<ElasticsearchJson.SearchHit, Object> getter =
+                ElasticsearchEnumerators.getter(fields, ImmutableMap.copyOf(mapping));
+
+        ElasticsearchJson.SearchHits hits =
+                new ElasticsearchJson.SearchHits(res.searchHits().total(), result.stream()
+                        .map(r -> new ElasticsearchJson.SearchHit("_id", r, null))
+                        .collect(Collectors.toList()));
+
+        return Linq4j.asEnumerable(hits.hits()).select(getter);
     }
 
-    // elastic exposes total number of documents matching a query in "/hits/total" path
-    // this can be used for simple "select count(*) from table"
-    final long total = res.searchHits().total().value();
-
-    if (groupBy.isEmpty()) {
-      // put totals automatically for count(*) expression(s), unless they contain group by
-      for (String expr : countAll) {
-        result.forEach(m -> m.put(expr, total));
-      }
+    @Override
+    public RelDataType getRowType(RelDataTypeFactory relDataTypeFactory) {
+        final RelDataType mapType = relDataTypeFactory.createMapType(
+                relDataTypeFactory.createSqlType(SqlTypeName.VARCHAR),
+                relDataTypeFactory.createTypeWithNullability(
+                        relDataTypeFactory.createSqlType(SqlTypeName.ANY),
+                        true));
+        return relDataTypeFactory.builder().add("_MAP", mapType).build();
     }
 
-    final Function1<ElasticsearchJson.SearchHit, Object> getter =
-        ElasticsearchEnumerators.getter(fields, ImmutableMap.copyOf(mapping));
-
-    ElasticsearchJson.SearchHits hits =
-        new ElasticsearchJson.SearchHits(res.searchHits().total(), result.stream()
-            .map(r -> new ElasticsearchJson.SearchHit("_id", r, null))
-            .collect(Collectors.toList()));
-
-    return Linq4j.asEnumerable(hits.hits()).select(getter);
-  }
-
-  @Override public RelDataType getRowType(RelDataTypeFactory relDataTypeFactory) {
-    final RelDataType mapType = relDataTypeFactory.createMapType(
-        relDataTypeFactory.createSqlType(SqlTypeName.VARCHAR),
-        relDataTypeFactory.createTypeWithNullability(
-            relDataTypeFactory.createSqlType(SqlTypeName.ANY),
-            true));
-    return relDataTypeFactory.builder().add("_MAP", mapType).build();
-  }
-
-  @Override public String toString() {
-    return "ElasticsearchTable{" + indexName + "}";
-  }
-
-  @Override public <T> Queryable<T> asQueryable(QueryProvider queryProvider, SchemaPlus schema,
-      String tableName) {
-    return new ElasticsearchQueryable<>(queryProvider, schema, this, tableName);
-  }
-
-  @Override public RelNode toRel(RelOptTable.ToRelContext context, RelOptTable relOptTable) {
-    final RelOptCluster cluster = context.getCluster();
-    return new ElasticsearchTableScan(cluster, cluster.traitSetOf(ElasticsearchRel.CONVENTION),
-        relOptTable, this, null);
-  }
-
-  /**
-   * Implementation of {@link Queryable} based on
-   * a {@link ElasticsearchTable}.
-   *
-   * @param <T> element type
-   */
-  public static class ElasticsearchQueryable<T> extends AbstractTableQueryable<T> {
-    ElasticsearchQueryable(QueryProvider queryProvider, SchemaPlus schema,
-        ElasticsearchTable table, String tableName) {
-      super(queryProvider, schema, table, tableName);
+    @Override
+    public String toString() {
+        return "ElasticsearchTable{" + indexName + "}";
     }
 
-    public Enumerator<T> enumerator() {
-      return null;
+    @Override
+    public <T> Queryable<T> asQueryable(QueryProvider queryProvider, SchemaPlus schema,
+                                        String tableName) {
+        return new ElasticsearchQueryable<>(queryProvider, schema, this, tableName);
     }
 
-    private ElasticsearchTable getTable() {
-      return (ElasticsearchTable) table;
+    @Override
+    public RelNode toRel(RelOptTable.ToRelContext context, RelOptTable relOptTable) {
+        final RelOptCluster cluster = context.getCluster();
+        return new ElasticsearchTableScan(cluster, cluster.traitSetOf(ElasticsearchRel.CONVENTION),
+                relOptTable, this, null);
     }
 
-    /** Called via code-generation.
-     * @param ops list of queries (as strings)
-     * @param fields projection
-     * @see ElasticsearchMethod#ELASTICSEARCH_QUERYABLE_FIND
-     * @return result as enumerable
+    /**
+     * Implementation of {@link Queryable} based on
+     * a {@link ElasticsearchTable}.
+     *
+     * @param <T> element type
      */
-    @SuppressWarnings("UnusedDeclaration")
-    public Enumerable<Object> find(List<String> ops,
-         List<Map.Entry<String, Class>> fields,
-         List<Map.Entry<String, RelFieldCollation.Direction>> sort,
-         List<String> groupBy,
-         List<Map.Entry<String, String>> aggregations,
-         Map<String, String> mappings,
-         Map<String, String> projectItemMappings,
-         Long offset, Long fetch) {
-      try {
-        return getTable().find(ops, fields, sort, groupBy, aggregations, mappings, projectItemMappings, offset, fetch);
-      } catch (IOException e) {
-        throw new UncheckedIOException("Failed to query " + getTable().indexName, e);
-      }
-    }
+    public static class ElasticsearchQueryable<T> extends AbstractTableQueryable<T> {
+        ElasticsearchQueryable(QueryProvider queryProvider, SchemaPlus schema,
+                               ElasticsearchTable table, String tableName) {
+            super(queryProvider, schema, table, tableName);
+        }
 
-  }
+        public Enumerator<T> enumerator() {
+            return null;
+        }
+
+        private ElasticsearchTable getTable() {
+            return (ElasticsearchTable) table;
+        }
+
+        /**
+         * Called via code-generation.
+         *
+         * @param ops    list of queries (as strings)
+         * @param fields projection
+         * @return result as enumerable
+         * @see ElasticsearchMethod#ELASTICSEARCH_QUERYABLE_FIND
+         */
+        @SuppressWarnings("UnusedDeclaration")
+        public Enumerable<Object> find(List<String> ops,
+                                       List<Map.Entry<String, Class>> fields,
+                                       List<Map.Entry<String, RelFieldCollation.Direction>> sort,
+                                       List<String> groupBy,
+                                       List<Map.Entry<String, String>> aggregations,
+                                       Map<String, String> mappings,
+                                       Map<String, String> projectItemMappings,
+                                       Long offset, Long fetch) {
+            try {
+                return getTable().find(ops, fields, sort, groupBy, aggregations, mappings, projectItemMappings, offset, fetch);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to query " + getTable().indexName, e);
+            }
+        }
+
+    }
 }
 
 // End ElasticsearchTable.java
