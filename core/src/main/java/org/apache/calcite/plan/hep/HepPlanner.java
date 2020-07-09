@@ -16,20 +16,10 @@
  */
 package org.apache.calcite.plan.hep;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.calcite.linq4j.function.Function2;
 import org.apache.calcite.linq4j.function.Functions;
-import org.apache.calcite.plan.AbstractRelOptPlanner;
-import org.apache.calcite.plan.CommonRelSubExprRule;
-import org.apache.calcite.plan.Context;
-import org.apache.calcite.plan.RelOptCost;
-import org.apache.calcite.plan.RelOptCostFactory;
-import org.apache.calcite.plan.RelOptCostImpl;
-import org.apache.calcite.plan.RelOptMaterialization;
-import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.plan.RelOptRuleOperand;
-import org.apache.calcite.plan.RelTrait;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.Converter;
 import org.apache.calcite.rel.convert.ConverterRule;
@@ -40,27 +30,9 @@ import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.util.Pair;
 import org.apache.calcite.util.Util;
-import org.apache.calcite.util.graph.BreadthFirstIterator;
-import org.apache.calcite.util.graph.CycleDetector;
-import org.apache.calcite.util.graph.DefaultDirectedGraph;
-import org.apache.calcite.util.graph.DefaultEdge;
-import org.apache.calcite.util.graph.DepthFirstIterator;
-import org.apache.calcite.util.graph.DirectedGraph;
-import org.apache.calcite.util.graph.Graphs;
-import org.apache.calcite.util.graph.TopologicalOrderIterator;
+import org.apache.calcite.util.graph.*;
 
-import com.google.common.collect.ImmutableList;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * HepPlanner is a heuristic implementation of the {@link RelOptPlanner}
@@ -91,6 +63,8 @@ public class HepPlanner extends AbstractRelOptPlanner {
 
   private final boolean noDag;
 
+  private final boolean ignoreTypeMismatch;
+
   /**
    * Query graph, with edges directed from parent to child. This is a
    * single-rooted DAG, possibly with additional roots corresponding to
@@ -112,7 +86,7 @@ public class HepPlanner extends AbstractRelOptPlanner {
    * @param program program controlling rule application
    */
   public HepPlanner(HepProgram program) {
-    this(program, null, false, null, RelOptCostImpl.FACTORY);
+    this(program, null, false);
   }
 
   /**
@@ -121,8 +95,8 @@ public class HepPlanner extends AbstractRelOptPlanner {
    * @param program program controlling rule application
    * @param context to carry while planning
    */
-  public HepPlanner(HepProgram program, Context context) {
-    this(program, context, false, null, RelOptCostImpl.FACTORY);
+  public HepPlanner(HepProgram program, Context context, boolean ignoreTypeMismatch) {
+    this(program, context, false, null, RelOptCostImpl.FACTORY, ignoreTypeMismatch);
   }
 
   /**
@@ -139,11 +113,13 @@ public class HepPlanner extends AbstractRelOptPlanner {
       Context context,
       boolean noDag,
       Function2<RelNode, RelNode, Void> onCopyHook,
-      RelOptCostFactory costFactory) {
+      RelOptCostFactory costFactory,
+      boolean ignoreTypeMismatch) {
     super(costFactory, context);
     this.mainProgram = program;
     this.onCopyHook = Util.first(onCopyHook, Functions.ignore2());
     this.noDag = noDag;
+    this.ignoreTypeMismatch= ignoreTypeMismatch;
   }
 
   //~ Methods ----------------------------------------------------------------
@@ -545,12 +521,12 @@ public class HepPlanner extends AbstractRelOptPlanner {
     }
 
     HepRuleCall call =
-        new HepRuleCall(
-            this,
-            rule.getOperand(),
-            bindings.toArray(new RelNode[0]),
-            nodeChildren,
-            parents);
+            new HepRuleCall(
+                    this,
+                    rule.getOperand(),
+                    bindings.toArray(new RelNode[0]),
+                    nodeChildren,
+                    parents, ignoreTypeMismatch);
 
     // Allow the rule to apply its own side-conditions.
     if (!rule.matches(call)) {
