@@ -54,7 +54,8 @@ public class HepRuleCall extends RelOptRuleCall {
   // implement RelOptRuleCall
   public void transformTo(RelNode rel, Map<RelNode, RelNode> equiv) {
     final RelNode rel0 = rels[0];
-    RelOptUtil.verifyTypeEquivalence(rel0, rel, rel0);
+    //Edit by GYQ, since there are plenty demand of table scan modification, close type verify
+//    RelOptUtil.verifyTypeEquivalence(rel0, rel, rel0);
     results.add(rel);
     rel(0).getCluster().invalidateMetadataQuery();
   }
