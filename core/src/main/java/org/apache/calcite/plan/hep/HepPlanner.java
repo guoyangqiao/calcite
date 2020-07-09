@@ -95,9 +95,19 @@ public class HepPlanner extends AbstractRelOptPlanner {
    * @param program program controlling rule application
    * @param context to carry while planning
    */
+  public HepPlanner(HepProgram program, Context context) {
+    this(program, context, false, null, RelOptCostImpl.FACTORY, false);
+  }
+  /**
+   * Creates a new HepPlanner that allows DAG.
+   *
+   * @param program program controlling rule application
+   * @param context to carry while planning
+   */
   public HepPlanner(HepProgram program, Context context, boolean ignoreTypeMismatch) {
     this(program, context, false, null, RelOptCostImpl.FACTORY, ignoreTypeMismatch);
   }
+
 
   public HepPlanner(
           HepProgram program,
