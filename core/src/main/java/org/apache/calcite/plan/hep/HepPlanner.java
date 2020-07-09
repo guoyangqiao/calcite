@@ -99,6 +99,15 @@ public class HepPlanner extends AbstractRelOptPlanner {
     this(program, context, false, null, RelOptCostImpl.FACTORY, ignoreTypeMismatch);
   }
 
+  public HepPlanner(
+          HepProgram program,
+          Context context,
+          boolean noDag,
+          Function2<RelNode, RelNode, Void> onCopyHook,
+          RelOptCostFactory costFactory) {
+    this(program, context, noDag, onCopyHook, costFactory, false);
+  }
+
   /**
    * Creates a new HepPlanner with the option to keep the graph a
    * tree (noDag = true) or allow DAG (noDag = false).
